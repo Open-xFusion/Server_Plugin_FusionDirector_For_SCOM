@@ -474,9 +474,7 @@ namespace FusionDirectorPlugin.Service
                 this.IISProcess.Start();
                 this.IISProcess.BeginErrorReadLine();
                 this.IISProcess.BeginOutputReadLine();
-                //RunCmd("netsh http delete sslcert ipport=0.0.0.0:" + this.pluginConfig.InternetPort + "");
-                //RunCmd("netsh http add sslcert ipport=0.0.0.0:" + this.pluginConfig.InternetPort + " certhash=23d05922ea28365820120ed7a2f98b34dcd09222 appid={214124cd-d05b-4309-9af9-9caa44b2b74a}");
-            }
+             }
             catch (Exception ex)
             {
                 this.OnError("RunWebServer Error: ", ex);
@@ -1262,7 +1260,9 @@ namespace FusionDirectorPlugin.Service
                         || sslPolicyErrors == SslPolicyErrors.RemoteCertificateNameMismatch);
                      using (SslStream ssl = new SslStream(client.GetStream(), false, CertificateValidationCallback, null)) 
                      {
-                        ssl.AuthenticateAsClient(url);
+                        var SecurityProtocol = (SecurityProtocolType) MySecurityProtocolType.Tls 
+                            | (SecurityProtocolType) MySecurityProtocolType.Tls11 | (SecurityProtocolType) MySecurityProtocolType.Tls12;
+                        ssl.AuthenticateAsClient(url, null, (System.Security.Authentication.SslProtocols) SecurityProtocol, false);
                         cert = new X509Certificate2(ssl.RemoteCertificate);
                      }
                 }

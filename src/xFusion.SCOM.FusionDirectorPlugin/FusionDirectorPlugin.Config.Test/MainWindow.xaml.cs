@@ -32,7 +32,6 @@ namespace FusionDirectorPlugin.Config.Test
     {
         public MainWindow()
         {
-            InitializeComponent();
         }
     }
 }

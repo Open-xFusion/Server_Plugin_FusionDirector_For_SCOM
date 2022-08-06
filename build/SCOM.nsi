@@ -147,7 +147,7 @@ LangString Lan_CertPwd_Msg ${LANG_SIMPCHINESE} "÷§ È√‹¬Î£∫"
 ; MUI end ------
 
 Name "${PRODUCT_NAME} ${VERSION}"
-OutFile "XFUSION_FusionDirector_For_SCOM_Plugin_${VERSION}.${BUILD_NUMBER}.exe"
+OutFile "XFUSION_FusionDirector_For_SCOM_Plugin_${VERSION}.exe"
 InstallDir "$PROGRAMFILES64\XFUSION FusionDirector For SCOM plugin"
 ;InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show
@@ -207,7 +207,7 @@ Section -Post
  ; WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\Configuration\xFusion.SCOMPlugin.WindowsService.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
-  WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${VERSION}.${BUILD_NUMBER}"
+  WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PATH_KEY}" "FDSCOMPLUGIN" "$INSTDIR"

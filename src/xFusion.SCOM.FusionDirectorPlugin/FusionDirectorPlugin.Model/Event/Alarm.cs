@@ -79,6 +79,9 @@ namespace FusionDirectorPlugin.Model.Event
         /// <returns>System.String.</returns>
         private string GetSeverity(string eventInfoSeverity)
         {
+            if (eventInfoSeverity == null) {
+                return "4";
+            }
             switch (eventInfoSeverity.ToUpper())
             {
                 case "1":
@@ -105,6 +108,9 @@ namespace FusionDirectorPlugin.Model.Event
         /// <returns>System.String.</returns>
         private string GetCategory(string eventInfoSeverity)
         {
+            if (eventInfoSeverity == null) {
+                return "3";
+            }
             switch (eventInfoSeverity.ToUpper())
             {
                 case "1":
