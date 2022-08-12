@@ -2,14 +2,14 @@
 
 
 **********************************************************************************
-XFUSION FusionDirector for System Center Operations Manager plugin
+XFUSION FusionDirector plugin for System Center Operations Manager
 **********************************************************************************
 
 I. General Information 
 
     Name:     XFUSION_FusionDirector_For_SCOM plugin
-    Category: Monitoring、Alarm
-    version : 1.0.16.211
+    Category: Monitoring, Alarm
+    version : 1.0.17
     
 II. Function Description
     
@@ -23,14 +23,14 @@ II. Function Description
 
 III. Version notice
     
-    1. Compatible with SCOM 2016/2019.
-    2. Interconnected with FD 1.6.1.SPC2/1.6.0.SPC1.
+    1. Compatible with SCOM 2016/2019/2022.
+    2. Interconnected with FD 1.6.1.SPC2/1.6.0.SPC1/1.7.0/1.7.1.SPC2/1.7.3.
     3. Security rectification.
 
 IV. Additional Resources
 
-    For more information consult User Guide: https://github.com/Open-xFusion/Server_Plugin_FusionDirector_For_SCOM/tree/main/docs
+    For more information consult User Guide: https://github.com/open-xfusion/Server_Plugin_FusionDirector_For_SCOM/tree/master/docs
   
 V. Open Source Software Notice
     
-    https://github.com/Open-xFusion/Server_Plugin_FusionDirector_For_SCOM/tree/main/docs/Open%20Source%20Software%20Notice.doc
+    https://github.com/open-xfusion/Server_Plugin_FusionDirector_For_SCOM/blob/master/docs/Open%20Source%20Software%20Notice.doc

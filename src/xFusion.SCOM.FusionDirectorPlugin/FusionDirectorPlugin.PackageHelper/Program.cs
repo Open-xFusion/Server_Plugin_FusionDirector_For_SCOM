@@ -433,7 +433,6 @@ namespace FusionDirectorPlugin.PackageHelper
             try
             {
                 OnLog($"ImportCerts Start");
-
                 CertHelper.ImportCertByPath(Path.GetFullPath($"{RunPath}\\..\\Certs\\xFusionEquipmentRootCA.crt"));
                 CertHelper.ImportCertByPath(Path.GetFullPath($"{RunPath}\\..\\Certs\\xFusionITProductCA.crt"));
                 CertHelper.ImportCertByPath(Path.GetFullPath($"{RunPath}\\..\\Certs\\xFusionTERootCA.crt"));
@@ -456,7 +455,13 @@ namespace FusionDirectorPlugin.PackageHelper
             try
             {
                 OnLog($"start set web server ssl ");
-                RunCmd("netsh http add sslcert ipport=0.0.0.0:" + port + " certhash=8a85ec651afb87ac080467a2b21f1a35a6957190 appid={214124cd-d05b-4309-9af9-9caa44b2b74a}");
+                string cmd = "netsh http add sslcert ipport=0.0.0.0:" + port 
+                    + " certhash=8a85ec651afb87ac080467a2b21f1a35a6957190 appid={214124cd-d05b-4309-9af9-9caa44b2b74a}";
+                string output = RunCmd(cmd + " disablelegacytls=enable");
+                if (!output.Contains("成功添加") && !output.ToLower().Contains("successfully added")) {
+                    output = RunCmd(cmd);
+                }
+                OnLog(output);
                 OnLog($" set web server ssl end");
             }
             catch (Exception ex)
@@ -475,7 +480,7 @@ namespace FusionDirectorPlugin.PackageHelper
                 if (port == 0) {
                     port = ConfigHelper.GetPluginConfig().InternetPort;
                 }
-                RunCmd("netsh http delete sslcert ipport=0.0.0.0:" + port + "");
+                OnLog(RunCmd("netsh http delete sslcert ipport=0.0.0.0:" + port + ""));
                 OnLog($" delete web server ssl end");
             }
             catch (Exception ex)
@@ -904,7 +909,7 @@ namespace FusionDirectorPlugin.PackageHelper
             ConfigHelper.SavePluginConfig(config, path);
         }
 
-        public static void RunCmd(string cmd)
+        public static string RunCmd(string cmd)
         {
             cmd = cmd.Trim().TrimEnd('&') + "&exit";//说明：不管命令是否成功均执行exit命令，否则当调用ReadToEnd()方法时，会处于假死状态
             using (Process p = new Process())
@@ -922,9 +927,10 @@ namespace FusionDirectorPlugin.PackageHelper
                 p.StandardInput.AutoFlush = true;
 
                 //获取cmd窗口的输出信息
-                OnLog(p.StandardOutput.ReadToEnd());
+                string output = p.StandardOutput.ReadToEnd();
                 p.WaitForExit();//等待程序执行完退出进程
                 p.Close();
+                return output;
             }
         }
     }

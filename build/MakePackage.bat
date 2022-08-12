@@ -35,6 +35,6 @@ echo mainVersion=%mainVersion%
 rem do package
 set SetupScriptPath=%WORKSPACE%\build\SCOM.nsi
 echo execute %SetupScriptPath%
-"%WORKSPACE%\build\NSIS-Unicode\makensis.exe" /DVERSION=%mainVersion% /DBUILD_NUMBER=%BUILD_NUMBER% "%SetupScriptPath%"
+"%WORKSPACE%\build\NSIS-Unicode\makensis.exe" /DVERSION=%mainVersion% "%SetupScriptPath%"
 
 Pause

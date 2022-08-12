@@ -58,7 +58,6 @@ namespace FusionDirectorPlugin.PluginConfigs.Helpers
                     {
                         XmlSerializer serializer = new XmlSerializer(type);
                         string config = File.ReadAllText(filename);
-                        HWLogger.Service.Info($"Plugin Configuration is:: {config}");
                         using (TextReader reader = new StringReader(config))
                         {
                             return serializer.Deserialize(reader);

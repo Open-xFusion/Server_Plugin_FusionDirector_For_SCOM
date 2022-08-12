@@ -8,6 +8,7 @@ using FusionDirectorPlugin.Model;
 using FusionDirectorPlugin.Model.Event;
 using Microsoft.EnterpriseManagement.Configuration;
 using Microsoft.EnterpriseManagement.Monitoring;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -231,31 +232,42 @@ namespace FusionDirectorPlugin.Service
         /// <param name="monitoringObject"></param>
         private void CloseSCOMAlert(EventData eventObject, MonitoringDeviceObject monitoringObject)
         {
-            var alarm = eventObject.AlarmData;
-            logger.Polling.Info($"[{alarm.Sn}] alarm is cleared, close SCOM alert now.");
+            try
+            {
+                var alarm = eventObject.AlarmData;
+                logger.Polling.Info($"[{alarm.Sn}] alarm is cleared, close SCOM alert now.");
+                // We will identify the alert using suppression rule.
+                // Already closed alerts should be ignored.
+                var criteria = $"ResolutionState != '255' and CustomField1 = '{this.FusionDirector.UniqueId}' " +
+                                $"and CustomField3 = '{eventObject.AlarmSn}'";
+                ReadOnlyCollection<MonitoringAlert> alerts = monitoringObject.Device.GetMonitoringAlerts(new MonitoringAlertCriteria(criteria));
+                if (alerts.Count == 0)
+                {
+                    logger.Polling.Warn($"[{alarm.Sn}] No un-closed SCOM alert is associated with current alarm.");
+                }
+                else
+                {
+                    // It should be 1 in normal sutiation.
+                    logger.Polling.Info($"[{alarm.Sn}] Associated SCOM alerts count is: {alerts.Count}.");
+                }
+                foreach (MonitoringAlert alert in alerts)
+                {
+                    if (alert == null) 
+                    {
+                        continue;
+                    }
+                    alert.ResolutionState = EnclosureConnector.Instance.CloseState.ResolutionState;
+                    var reason = !string.IsNullOrEmpty(eventObject.AlarmData.ClearType) ? eventObject.AlarmData.ClearType 
+                                    : "Receive alarm cleared notification from subscription.";
+                    alert.Update(reason);
+                    logger.Polling.Info($"[{alarm.Sn}] Close SCOM alert successfully.");
+                }
+            }
+            catch (Exception e)
+            {
+                this.logger.Polling.Error(e, $"[CloseSCOMAlert] Failed to close SCOM alarm. "  );
+            }
 
-            // We will identify the alert using suppression rule.
-            // Already closed alerts should be ignored.
-            var criteria = $"ResolutionState != '255' and CustomField1 = '{this.FusionDirector.UniqueId}' " +
-                            $"and CustomField3 = '{eventObject.AlarmSn}'";
-            ReadOnlyCollection<MonitoringAlert> alerts = monitoringObject.Device.GetMonitoringAlerts(new MonitoringAlertCriteria(criteria));
-            if (alerts.Count == 0)
-            {
-                logger.Polling.Warn($"[{alarm.Sn}] No un-closed SCOM alert is associated with current alarm.");
-            }
-            else
-            {
-                // It should be 1 in normal sutiation.
-                logger.Polling.Info($"[{alarm.Sn}] Associated SCOM alerts count is: {alerts.Count}.");
-            }
-
-            foreach (MonitoringAlert alert in alerts)
-            {
-                alert.ResolutionState = EnclosureConnector.Instance.CloseState.ResolutionState;
-                var reason = !string.IsNullOrEmpty(eventObject.AlarmData.ClearType) ? eventObject.AlarmData.ClearType : "Receive alarm cleared notification from subscription.";
-                alert.Update(reason);
-                logger.Polling.Info($"[{alarm.Sn}] Close SCOM alert successfully.");
-            }
         }
         #endregion
 
@@ -418,12 +430,15 @@ namespace FusionDirectorPlugin.Service
                 // find all alerts that is still open in SCOM but not in esight ope
                 alerts.ToList().ForEach(alert =>
                 {
+                    if (alert == null) 
+                    {
+                        return;
+                    }
                     bool exists = allOpenAlarms.Any(alarm =>
                     {
                         var data = new AlarmData(alarm);
                         return GetScomAlertSuppressionPredicator(data).Invoke(alert);
                     });
-
                     if (!exists)
                     {
                         alert.ResolutionState = EnclosureConnector.Instance.CloseState.ResolutionState;
