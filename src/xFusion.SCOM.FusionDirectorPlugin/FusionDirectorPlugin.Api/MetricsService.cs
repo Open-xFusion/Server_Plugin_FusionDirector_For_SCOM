@@ -39,9 +39,7 @@ namespace FusionDirectorPlugin.Api
             var url = $"{BaseUrl}/redfish/v1/rich/Statistics/{serverID}/RealTime";
             try
             {
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                var responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<ServerRealTimePerformance>(responseData);
             }
             catch (Exception e)

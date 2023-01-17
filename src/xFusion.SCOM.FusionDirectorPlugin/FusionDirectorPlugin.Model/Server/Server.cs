@@ -171,7 +171,7 @@ namespace FusionDirectorPlugin.Model
         {
             get
             {
-                int count = this.ProcessorSummary.FirstOrDefault()?.Count ?? 0;
+                int count = this.ProcessorSummary?.FirstOrDefault()?.Count ?? 0;
                 if (count == 0)
                 {
                     return string.Empty;

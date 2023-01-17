@@ -31,6 +31,11 @@ namespace FusionDirectorPlugin.ViewLib
     public partial class FdConfigDashboard : UserControl, INotifyPropertyChanged
     {
         private Result _actionResult = Result.Done();
+
+        private static DispatcherTimer dispatcherTimer = null;
+
+        private static readonly object locker = new object();
+
         public Result ActionResult
         {
             get { return _actionResult; }
@@ -54,21 +59,30 @@ namespace FusionDirectorPlugin.ViewLib
             InitializeComponent();
             add_btn.IsEnabled = false;
             this.FdApplianceRepo = this.Resources["FdApplianceRepo"] as FdApplianceRepo;
-            this.Loaded += FdConfigDashboard_Loaded;
-            this.dispatcherTimer_Tick(null, null);//首先触发一次
+            this.Loaded += FdConfigDashboardLoaded;
+            // 首先触发一次
+            this.DispatcherTimerTick(null, null);
         }
 
-        private void FdConfigDashboard_Loaded(object sender, RoutedEventArgs e)
+        private void FdConfigDashboardLoaded(object sender, RoutedEventArgs e)
         {
-            // Start dispatcher timer
-            DispatcherTimer dispatcherTimer = new DispatcherTimer();
-            dispatcherTimer.Tick += new EventHandler(dispatcherTimer_Tick);
-            dispatcherTimer.Interval = new TimeSpan(0, 0, 30);
-            dispatcherTimer.Start();
+            lock (locker)
+            {
+                if (dispatcherTimer != null)
+                {
+                    return;
+                }
+                // Start dispatcher timer
+                dispatcherTimer = new DispatcherTimer();
+                dispatcherTimer.Tick += new EventHandler(DispatcherTimerTick);
+                dispatcherTimer.Interval = new TimeSpan(0, 0, 60);
+                dispatcherTimer.Start();
+                LogHelper.Info($"Load FusionDirector DispatcherTimer start success!");
+            }
         }
 
-        //Refreshes grid data on timer tick
-        protected void dispatcherTimer_Tick(object sender, EventArgs e)
+        // Refreshes grid data on timer tick
+        protected void DispatcherTimerTick(object sender, EventArgs e)
         {
             Task.Run(async () =>
             {

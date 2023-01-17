@@ -194,6 +194,7 @@ namespace FusionDirectorPlugin.Service
                                     var info = await eventService.GetEventsInfoAsync(eventSummary.SerialNumber.ToString());
                                     AlarmDatas.Enqueue(new AlarmData(info));
                                 }
+                                Thread.Sleep(TimeSpan.FromSeconds(1));
                             }
                             catch (Exception e)
                             {
@@ -289,7 +290,7 @@ namespace FusionDirectorPlugin.Service
                         exsit.FirstRefreshTime = DateTime.Now.AddSeconds(10);
                         StartFirstUpdateServer(exsit, true);
                     }
-                    logger.NotifyProcess.Debug($"{logPre} [preSn:{ exsit.Sn}] Delay LastRefreshTime:{DateTime.Now.AddSeconds(60):HH:mm:ss}.");
+                    logger.NotifyProcess.Debug($"{logPre} [preSn:{exsit.Sn}] Delay LastRefreshTime:{DateTime.Now.AddSeconds(60):HH:mm:ss}.");
                     exsit.Sn = sn;
                     exsit.LastRefreshTime = DateTime.Now.AddSeconds(60);//延长最后一次刷新时间
                     return;
@@ -330,7 +331,7 @@ namespace FusionDirectorPlugin.Service
                         exsit.FirstRefreshTime = DateTime.Now.AddSeconds(10);
                         StartFirstUpdateEnclosure(exsit, true);
                     }
-                    logger.NotifyProcess.Debug($"{logPre} [preSn:{ exsit.Sn}] Delay LastRefreshTime:{exsit.LastRefreshTime:HH:mm:ss}.");
+                    logger.NotifyProcess.Debug($"{logPre} [preSn:{exsit.Sn}] Delay LastRefreshTime:{exsit.LastRefreshTime:HH:mm:ss}.");
 
                     exsit.Sn = sn;
                     exsit.LastRefreshTime = DateTime.Now.AddSeconds(60);//延长最后一次刷新时间

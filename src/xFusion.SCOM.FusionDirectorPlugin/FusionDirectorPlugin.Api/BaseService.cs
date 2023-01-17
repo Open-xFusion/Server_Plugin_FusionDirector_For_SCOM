@@ -30,6 +30,8 @@ using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using FusionDirectorPlugin.Dal;
 using FusionDirectorPlugin.Dal.Model;
 using FusionDirectorPlugin.LogUtil;
@@ -213,6 +215,33 @@ namespace FusionDirectorPlugin.Api
             {
                 this.httpClient.Dispose();
             }
+        }
+
+        /**
+        * 公共GetAsync方法
+        */
+        public async Task<string> BaseGetAsync(string url, double sleepTime = 1)
+        {
+            var response = await BaseGetAsyncResponse(url, sleepTime);
+            var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            this.ProcessResponse(url, response, data: responseData);
+            return responseData;
+        }
+
+        /**
+        * 公共BaseGetAsyncResponse方法
+        */
+        private async Task<HttpResponseMessage> BaseGetAsyncResponse(string url, double sleepTime = 1)
+        {
+            var response = await httpClient.GetAsync(url);
+            int tryTimes = 0;
+            while ((int)response.StatusCode == 429 && tryTimes < 20)
+            {
+                tryTimes++;
+                Thread.Sleep(TimeSpan.FromSeconds(sleepTime));
+                response = await this.httpClient.GetAsync(url);
+            }
+            return response;
         }
     }
 }

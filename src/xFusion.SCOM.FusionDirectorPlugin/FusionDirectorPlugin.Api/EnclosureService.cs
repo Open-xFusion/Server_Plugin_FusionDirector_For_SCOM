@@ -79,9 +79,7 @@ namespace FusionDirectorPlugin.Api
             var url = urlBuilder.ToString();
             try
             {
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData, "Info");
+                string responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<EnclosureList>(responseData);
             }
             catch (Exception e)
@@ -101,9 +99,7 @@ namespace FusionDirectorPlugin.Api
             var url = $"{BaseUrl}/redfish/v1/rich/Enclosures/{id}";
             try
             {
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                string responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<Enclosure>(responseData);
             }
             catch (Exception e)

@@ -249,6 +249,7 @@ namespace FusionDirectorPlugin.Service
                              EnclosureConnector.Instance.Sync(enclosure).Wait();
                          }, cts.Token);
                          this.taskList.Add(task);
+                         Thread.Sleep(TimeSpan.FromSeconds(1));
                      }
                  }
                  catch (Exception ex)
@@ -308,17 +309,17 @@ namespace FusionDirectorPlugin.Service
 
                     foreach (var x in serverList)
                     {
-                        var task = taskFactory.StartNew(() =>
+                        var task = taskFactory.StartNew(async () =>
                         {
-                            var server = this.QueryServerDetails(x).Result;
-                            logger.Polling.Debug($"[{taskId}]QueryServerDetails Finish:[{JsonConvert.SerializeObject(server)}].");
-                            ServerConnector.Instance.Sync(server).Wait();
+                            Server server = await QueryServerDetails(x);
+                            await ServerConnector.Instance.Sync(server);
                             if (server.ServerState.ToUpper() == "READY")
                             {
                                 DealServerPerformance(x).Wait();
                             }
                         }, cts.Token);
                         this.taskList.Add(task);
+                        Thread.Sleep(TimeSpan.FromSeconds(1));
                     }
                 }
                 catch (Exception ex)
@@ -371,9 +372,9 @@ namespace FusionDirectorPlugin.Service
                 var manager = await this.nodePoolService.GetServerManagerCollectionAsync(serverId);
                 return manager;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                OnPollingError($"GetServerManager Error:[ServerId:{serverId}]", ex);
+                logger.Polling.Error($"GetServerManager Error:[ServerId:{serverId}]");
                 //throw;
                 return null;
             }
@@ -413,6 +414,7 @@ namespace FusionDirectorPlugin.Service
                 foreach (var x in serverList)
                 {
                     await DealServerPerformance(x);
+                    Thread.Sleep(TimeSpan.FromSeconds(1));
                 }
             }
             catch (Exception ex)
