@@ -26,7 +26,6 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Security.Authentication;
 using System.Text;
@@ -34,13 +33,14 @@ using FusionDirectorPlugin.ViewLib.Model;
 using FusionDirectorPlugin.ViewLib.Utils;
 using System.Threading.Tasks;
 using System.Net.Security;
+using System.Threading;
 
 namespace FusionDirectorPlugin.ViewLib.Client
 {
     /// <summary>
     /// Class FdClient.
     /// </summary>
-    internal class FdClient: IDisposable
+    internal class FdClient : IDisposable
     {
 
         #region Constructor
@@ -120,7 +120,7 @@ namespace FusionDirectorPlugin.ViewLib.Client
             var url = this.BaseUrl + "/redfish/v1/rich/Appliance/Version";
             try
             {
-                var response = await this.httpClient.GetAsync(url);
+                var response = await BaseGetAsync(url, 2);
                 response.EnsureSuccessStatusCode();
                 var responseData = response.Content.ReadAsStringAsync().Result;
                 return this.ReadAsJsonDataContract<ApplianceVersion>(responseData);
@@ -141,7 +141,7 @@ namespace FusionDirectorPlugin.ViewLib.Client
             var ret = Result.Failed(-1, "Connect failed!");
             try
             {
-                var response = await this.httpClient.GetAsync(url);
+                var response = await BaseGetAsync(url);
                 if (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Created)
                 {
                     ret = Result.Done("Connect successful!");
@@ -151,7 +151,7 @@ namespace FusionDirectorPlugin.ViewLib.Client
                     ret.Message = this.GetErrorMessage(response.StatusCode);
                 }
             }
-            catch  (TaskCanceledException)
+            catch (TaskCanceledException)
             {
                 ret.Message = "Connect timeout";
             }
@@ -181,7 +181,7 @@ namespace FusionDirectorPlugin.ViewLib.Client
                     throw new ArgumentNullException("id");
                 }
                 url = url.Replace("{id}", Uri.EscapeDataString(id));
-                var response = await this.httpClient.DeleteAsync(url);
+                var response = await BaseDeleteAsync(url);
                 var responseData = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode)
                 {
@@ -265,6 +265,32 @@ namespace FusionDirectorPlugin.ViewLib.Client
             {
                 this.httpClient.Dispose();
             }
+        }
+
+        private async Task<HttpResponseMessage> BaseGetAsync(string url, double sleepTime = 1)
+        {
+            var response = await httpClient.GetAsync(url);
+            int tryTimes = 0;
+            while ((int)response.StatusCode == 429 && tryTimes < 5)
+            {
+                tryTimes++;
+                Thread.Sleep(TimeSpan.FromSeconds(sleepTime));
+                response = await this.httpClient.GetAsync(url);
+            }
+            return response;
+        }
+        
+        private async Task<HttpResponseMessage> BaseDeleteAsync(string url)
+        {
+            var response = await this.httpClient.DeleteAsync(url);
+            int tryTimes = 0;
+            while ((int)response.StatusCode == 429 && tryTimes < 5)
+            {
+                tryTimes++;
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+                response = await this.httpClient.DeleteAsync(url);
+            }
+            return response;
         }
     }
 }

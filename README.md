@@ -9,7 +9,7 @@ I. General Information
 
     Name:     XFUSION_FusionDirector_For_SCOM plugin
     Category: Monitoring, Alarm
-    version : 1.0.17
+    version : 1.0.18
     
 II. Function Description
     
@@ -24,7 +24,7 @@ II. Function Description
 III. Version notice
     
     1. Compatible with SCOM 2016/2019/2022.
-    2. Interconnected with FD 1.6.1.SPC2/1.6.0.SPC1/1.7.0/1.7.1.SPC2/1.7.3.
+    2. Interconnected with FusionDirector 1.6.0.SPC1 and above.
     3. Security rectification.
 
 IV. Additional Resources

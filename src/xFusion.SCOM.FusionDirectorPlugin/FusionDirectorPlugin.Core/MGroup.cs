@@ -197,7 +197,15 @@ namespace FusionDirectorPlugin.Core
                     catch (Exception ex)
                     {
                         HWLogger.Service.Error(ex, "keep Management Group Connection error");
-                        this.Reconnect();
+                        try
+                        {
+                            this.Reconnect();
+                            HWLogger.Service.Info(ex, "Management Group Reconnect success");
+                        }
+                        catch (Exception ex1)
+                        {
+                            HWLogger.Service.Error(ex1, "Management Group Reconnect error");
+                        }
                     }
                 };
             timer.Start();

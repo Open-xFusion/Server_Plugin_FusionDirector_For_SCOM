@@ -1,23 +1,18 @@
-﻿using CommonUtil;
-using FusionDirectorPlugin.Core;
+﻿using FusionDirectorPlugin.Core;
 using FusionDirectorPlugin.Core.Const;
 using FusionDirectorPlugin.Core.Model;
 using FusionDirectorPlugin.Dal.Model;
-using FusionDirectorPlugin.LogUtil;
 using FusionDirectorPlugin.Model;
 using FusionDirectorPlugin.Model.Event;
 using Microsoft.EnterpriseManagement.Configuration;
 using Microsoft.EnterpriseManagement.Monitoring;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using static xFusion.SCOM.ESightPlugin.Const.Constants;
 using static xFusion.SCOM.ESightPlugin.Const.Constants.ESightEventeLogSource;
 
@@ -89,9 +84,14 @@ namespace FusionDirectorPlugin.Service
                     {
                         logger.Polling.Info($"Current Alarm Processing Queue amount: {AlarmQueue.Count}.");
 
-                        if (AlarmQueue.Count > 0 || ReceiveAlarmEvent.WaitOne())
+                        if (AlarmQueue.Count == 0 && !ReceiveAlarmEvent.WaitOne())
                         {
-                            AlarmData alarm = null;
+                            Thread.Sleep(TimeSpan.FromSeconds(30));
+                            continue;
+                        }
+                        AlarmData alarm = null;
+                        try
+                        {
                             lock (this.locker)
                             {
                                 if (AlarmQueue.Count > 0)
@@ -99,55 +99,12 @@ namespace FusionDirectorPlugin.Service
                                     alarm = AlarmQueue.Dequeue();
                                 }
                             }
-
-                            if (alarm != null)
-                            {
-                                EventData eventObject = new EventData(alarm, this.FusionDirectorIp);
-                                logger.Polling.Info($"[{alarm.Sn}] Start processing alarm:: Source:{alarm.DeviceId}, Category:{alarm.EventCategory}, Status: {alarm.Status}.");
-
-                                var objectId = eventObject.UnionId;
-                                string mpClazzName = EventCategory.BMC.Equals(alarm.EventCategory) ? EntityTypeConst.Server.MainName : EntityTypeConst.Enclosure.MainName;
-                                ManagementPackClass mpClazz = MGroup.Instance.GetManagementPackClass(mpClazzName);
-                                MonitoringDeviceObject monitoringObject = BaseConnector.GetDeviceByObjectId(mpClazz, objectId);
-                                if (monitoringObject == null)
-                                {
-                                    // TODO(turnbig.net) should we trigger an update server task, and retry later?
-                                    logger.Polling.Warn($"[{alarm.Sn}] No MonitoringObject({objectId}) exists, alarm will be ignored.");
-                                    continue;
-                                }
-
-                                // waiting for monitoring-object ready.
-                                WaitForDeviceMonitored(monitoringObject);
-
-
-                                var now = DateTime.Now;
-                                ProcessedOn previewNProcessedOn = null;
-                                FixedSizedQueue<ProcessedOn> processedOnQueue = GetProcessedOnQueue(eventObject);
-                                if (EventStatus.Cleared.Equals(alarm.Status))
-                                {
-                                    // Close SCOM alert
-                                    CloseSCOMAlert(eventObject, monitoringObject);
-                                }
-                                else if (ShouldProcessedAlarmLevels.Contains(eventObject.LevelId))
-                                {
-                                    // Create New EventLog for new alarms, and generate SCOM alert through associated rule
-                                    CreateNewEventLogForAlarm(eventObject);
-                                    // use a seperated process on tracker
-                                    previewNProcessedOn = processedOnQueue.Enqueue(new ProcessedOn(now));
-                                }
-
-                                if (previewNProcessedOn != null)
-                                {
-                                    TimeSpan timeSpan = now - previewNProcessedOn.Timestamp;
-                                    // do not know why system time was changed to yestoday.
-                                    if (now >= previewNProcessedOn.Timestamp && timeSpan < RateLimitTimeSpan)
-                                    {
-                                        TimeSpan timeout = RateLimitTimeSpan - timeSpan;
-                                        logger.Polling.Info($"Alarm processing reach rate limit, {processedOnQueue.Size} alarms have been processed during time span {timeSpan}, will sleep {timeout} now.");
-                                        Thread.Sleep(timeout);
-                                    }
-                                }
-                            }
+                            DealAlarm(alarm);
+                            Thread.Sleep(TimeSpan.FromSeconds(1));
+                        }
+                        catch (Exception e)
+                        {
+                            logger.Polling.Error(e, $"Alarm handling failure: Source:{alarm?.DeviceId}, Sn:{alarm?.Sn}.");
                         }
                     }
                 });
@@ -155,6 +112,60 @@ namespace FusionDirectorPlugin.Service
 
             this.AlarmProcessor.Start();
             logger.Polling.Info("Alarm processor starts successfully.");
+        }
+
+        private void DealAlarm(AlarmData alarm)
+        {
+
+            if (alarm == null)
+            {
+                return;
+            }
+            EventData eventObject = new EventData(alarm, this.FusionDirectorIp);
+            logger.Polling.Info($"[{alarm.Sn}] Start processing alarm:: Source:{alarm.DeviceId}, Category:{alarm.EventCategory}, Status: {alarm.Status}, Sn: {alarm.Sn}.");
+
+            var objectId = eventObject.UnionId;
+            string mpClazzName = EventCategory.BMC.Equals(alarm.EventCategory) ? EntityTypeConst.Server.MainName : EntityTypeConst.Enclosure.MainName;
+            ManagementPackClass mpClazz = MGroup.Instance.GetManagementPackClass(mpClazzName);
+            MonitoringDeviceObject monitoringObject = BaseConnector.GetDeviceByObjectId(mpClazz, objectId);
+            if (monitoringObject == null)
+            {
+                // TODO(turnbig.net) should we trigger an update server task, and retry later?
+                logger.Polling.Warn($"[{alarm.Sn}] No MonitoringObject({objectId}) exists, alarm will be ignored.");
+                return;
+            }
+
+            // waiting for monitoring-object ready.
+            WaitForDeviceMonitored(monitoringObject);
+
+
+            var now = DateTime.Now;
+            ProcessedOn previewNProcessedOn = null;
+            FixedSizedQueue<ProcessedOn> processedOnQueue = GetProcessedOnQueue(eventObject);
+            if (EventStatus.Cleared.Equals(alarm.Status))
+            {
+                // Close SCOM alert
+                CloseSCOMAlert(eventObject, monitoringObject);
+            }
+            else if (ShouldProcessedAlarmLevels.Contains(eventObject.LevelId))
+            {
+                // Create New EventLog for new alarms, and generate SCOM alert through associated rule
+                CreateNewEventLogForAlarm(eventObject);
+                // use a seperated process on tracker
+                previewNProcessedOn = processedOnQueue.Enqueue(new ProcessedOn(now));
+            }
+
+            if (previewNProcessedOn != null)
+            {
+                TimeSpan timeSpan = now - previewNProcessedOn.Timestamp;
+                // do not know why system time was changed to yestoday.
+                if (now >= previewNProcessedOn.Timestamp && timeSpan < RateLimitTimeSpan)
+                {
+                    TimeSpan timeout = RateLimitTimeSpan - timeSpan;
+                    logger.Polling.Info($"Alarm processing reach rate limit, {processedOnQueue.Size} alarms have been processed during time span {timeSpan}, will sleep {timeout} now.");
+                    Thread.Sleep(timeout);
+                }
+            }
         }
 
         private FixedSizedQueue<ProcessedOn> GetProcessedOnQueue(EventData eventObject)
@@ -252,12 +263,12 @@ namespace FusionDirectorPlugin.Service
                 }
                 foreach (MonitoringAlert alert in alerts)
                 {
-                    if (alert == null) 
+                    if (alert == null)
                     {
                         continue;
                     }
                     alert.ResolutionState = EnclosureConnector.Instance.CloseState.ResolutionState;
-                    var reason = !string.IsNullOrEmpty(eventObject.AlarmData.ClearType) ? eventObject.AlarmData.ClearType 
+                    var reason = !string.IsNullOrEmpty(eventObject.AlarmData.ClearType) ? eventObject.AlarmData.ClearType
                                     : "Receive alarm cleared notification from subscription.";
                     alert.Update(reason);
                     logger.Polling.Info($"[{alarm.Sn}] Close SCOM alert successfully.");
@@ -265,7 +276,7 @@ namespace FusionDirectorPlugin.Service
             }
             catch (Exception e)
             {
-                this.logger.Polling.Error(e, $"[CloseSCOMAlert] Failed to close SCOM alarm. "  );
+                this.logger.Polling.Error(e, $"[CloseSCOMAlert] Failed to close SCOM alarm. ");
             }
 
         }
@@ -379,39 +390,45 @@ namespace FusionDirectorPlugin.Service
                         // we does not care about whether the alert exists or not indeed.
                         // if we insert same alert, it will just increase repeat count.
                         // But we still keep the old logics here. :)
-
-                        var alarm = new AlarmData(item);
-                        var alert = alerts.FirstOrDefault(GetScomAlertSuppressionPredicator(alarm));
-
-                        bool shouldProcess = false;
-                        if (alert != null)
+                        try
                         {
-                            // only alarm EventSource or EventSubject or Severity may be modified
-                            // shouldProcess = alert.CustomField7 != alarm.ResourceId;
-                            shouldProcess = false;
-                        }
-                        else
-                        {
-                            lock (this.locker)
+                            var alarm = new AlarmData(eventInfo: item);
+                            var alert = alerts.FirstOrDefault(GetScomAlertSuppressionPredicator(alarm));
+
+                            bool shouldProcess = false;
+                            if (alert != null)
                             {
-                                // find data from current alarm processing queue
-                                shouldProcess = !AlarmQueue.Any(_alarm =>
+                                // only alarm EventSource or EventSubject or Severity may be modified
+                                // shouldProcess = alert.CustomField7 != alarm.ResourceId;
+                                shouldProcess = false;
+                            }
+                            else
+                            {
+                                lock (this.locker)
                                 {
-                                    return _alarm.Sn.Equals(alarm.Sn);
-                                });
+                                    // find data from current alarm processing queue
+                                    shouldProcess = !AlarmQueue.Any(_alarm =>
+                                    {
+                                        return _alarm.Sn.Equals(alarm.Sn);
+                                    });
+                                }
+                            }
+
+                            if (shouldProcess)
+                            {
+                                logger.Polling.Info($"[SyncOpenAlarms] Alarm `{alarm.Sn}` has not been processed, submit to queue now.");
+                                // Submit new alarm to update the alert
+                                var info = await eventService.GetEventsInfoAsync(item.SerialNumber.ToString());
+                                SubmitNewAlarm(new AlarmData(info));
+                            }
+                            else
+                            {
+                                logger.Polling.Info($"[SyncOpenAlarms] Alarm `{alarm.Sn}` exists, ignore.");
                             }
                         }
-
-                        if (shouldProcess)
+                        catch (Exception e)
                         {
-                            logger.Polling.Info($"[SyncOpenAlarms] Alarm `{alarm.Sn}` has not been processed, submit to queue now.");
-                            // Submit new alarm to update the alert
-                            var info = await eventService.GetEventsInfoAsync(item.SerialNumber.ToString());
-                            SubmitNewAlarm(new AlarmData(info));
-                        }
-                        else
-                        {
-                            logger.Polling.Info($"[SyncOpenAlarms] Alarm `{alarm.Sn}` exists, ignore.");
+                            logger.Polling.Error(e, $"[SyncOpenAlarms] Alarm Error EventID:`{item?.EventID}`.");
                         }
                     }
                 }
@@ -430,7 +447,7 @@ namespace FusionDirectorPlugin.Service
                 // find all alerts that is still open in SCOM but not in esight ope
                 alerts.ToList().ForEach(alert =>
                 {
-                    if (alert == null) 
+                    if (alert == null)
                     {
                         return;
                     }

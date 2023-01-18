@@ -30,7 +30,6 @@ using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using FusionDirectorPlugin.ViewLib.Client;
 using FusionDirectorPlugin.ViewLib.Model;
@@ -85,7 +84,7 @@ namespace FusionDirectorPlugin.ViewLib.Repo
                         appliance.DirectorVersion = string.Empty;
                         appliance.LatestConnectInfo = "Can not connect the remote server.";
                         appliance.LatestStatus = Constants.FdConnectionStatus.FAILED;
-                        LogHelper.Info("Can not connect the remote server.", $"PingFd Error:");
+                        LogHelper.Info($"Can not connect the remote server:{appliance.HostIP}.", $"PingFd Error:");
                     }
                     try
                     {
@@ -104,7 +103,6 @@ namespace FusionDirectorPlugin.ViewLib.Repo
 
                 OnFilteredItemsChanged(this.AllItems);
                 return Result<List<FdAppliance>>.Done(this.AllItems);
-
             }
             catch (Exception ex)
             {

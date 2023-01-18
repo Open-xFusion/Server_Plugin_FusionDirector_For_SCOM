@@ -432,15 +432,15 @@ namespace FusionDirectorPlugin.Service
         }
 
         private void InitialWindowEventLog()
-{
+        {
             bool success = WindowEventLogHelper.CreateEventSourceIfNotExists(EVENT_SOURCE, EVENT_LOG_NAME);
             if (!success)
-{
+            {
                 HWLogger.Service.Error($"Could not create Window EventLog Source {EVENT_SOURCE} with {EVENT_LOG_NAME}");
                 this.OnError($"Failed to create window EventLog {EVENT_LOG_NAME} with Source {EVENT_SOURCE}");
             }
             else
-{
+            {
                 HWLogger.Service.Info($"Create Window EventLog Source {EVENT_SOURCE} with {EVENT_LOG_NAME} successfully.");
             }
         }
@@ -474,7 +474,7 @@ namespace FusionDirectorPlugin.Service
                 this.IISProcess.Start();
                 this.IISProcess.BeginErrorReadLine();
                 this.IISProcess.BeginOutputReadLine();
-             }
+            }
             catch (Exception ex)
             {
                 this.OnError("RunWebServer Error: ", ex);
@@ -511,7 +511,17 @@ namespace FusionDirectorPlugin.Service
         public void RunCheckFdChangesTask()
         {
             this.checkFdChangesTimer = new Timer(60 * 1000) { Enabled = true, AutoReset = true };
-            this.checkFdChangesTimer.Elapsed += (s, e) => { this.RunCheckFdChanges(); };
+            this.checkFdChangesTimer.Elapsed += (s, e) =>
+            {
+                try
+                {
+                    this.RunCheckFdChanges();
+                }
+                catch (Exception ex)
+                {
+                    this.OnError(ex.ToString());
+                }
+            };
             this.checkFdChangesTimer.Start();
         }
 
@@ -610,9 +620,9 @@ namespace FusionDirectorPlugin.Service
         public void AnalysisTcpMsg(string json)
         {
             HWLogger.NotifyRecv.Info($"Receive new TCP message: {json}");
-            var tcpMessage = JsonConvert.DeserializeObject<TcpMessage<object>>(json);
             try
             {
+                var tcpMessage = JsonConvert.DeserializeObject<TcpMessage<object>>(json);
                 var list = FusionDirectorDal.Instance.GetList();
                 var fusionDirector = list.FirstOrDefault(x => x.EventAuth == tcpMessage.Auth);
                 if (fusionDirector == null)
@@ -814,7 +824,7 @@ namespace FusionDirectorPlugin.Service
             });
         }
 
-        private void RunCheckCertTask() 
+        private void RunCheckCertTask()
         {
             Task.Run(() =>
             {
@@ -840,7 +850,7 @@ namespace FusionDirectorPlugin.Service
             bool isHaveOldAlarm = existAlarmData.Any(x => x.CustomField1 == EnumAlarmType.TLSVersion.ToString());
             if (!string.IsNullOrEmpty(message))
             {
-                if (isHaveOldAlarm) 
+                if (isHaveOldAlarm)
                 {
                     return;
                 }
@@ -871,7 +881,8 @@ namespace FusionDirectorPlugin.Service
         private void CreateOrCloseCertAlarm(List<MonitoringAlert> existAlarmData)
         {
             X509Certificate2 Cert = GetServerCert(pluginConfig.InternetIp, pluginConfig.InternetPort);
-            if (Cert == null) {
+            if (Cert == null)
+            {
                 return;
             }
             string message = CheckCertDate(Cert);
@@ -912,7 +923,7 @@ namespace FusionDirectorPlugin.Service
             if (cert.NotAfter.Subtract(DateTime.Now).Days <= 0)
             {
                 massage = "The certificate has expired.";
-            } 
+            }
             else if (cert.NotAfter.Subtract(DateTime.Now).Days <= 90)
             {
                 massage = "The certificate is about to expire.";
@@ -1079,16 +1090,16 @@ namespace FusionDirectorPlugin.Service
                 try
                 {
                     client.Connect(InternetIp, InternetPort);
-                    var CertificateValidationCallback =  new RemoteCertificateValidationCallback(
+                    var CertificateValidationCallback = new RemoteCertificateValidationCallback(
                         (object sender, X509Certificate certificate, X509Chain chain,
-                        SslPolicyErrors sslPolicyErrors) => sslPolicyErrors == SslPolicyErrors.None 
+                        SslPolicyErrors sslPolicyErrors) => sslPolicyErrors == SslPolicyErrors.None
                         || sslPolicyErrors == SslPolicyErrors.RemoteCertificateNameMismatch);
-                     using (SslStream ssl = new SslStream(client.GetStream(), false, CertificateValidationCallback, null)) 
-                     {
-                        var SecurityProtocol = (SecurityProtocolType) MySecurityProtocolType.Tls | (SecurityProtocolType) MySecurityProtocolType.Tls11;
-                        ssl.AuthenticateAsClient(url, null, (System.Security.Authentication.SslProtocols) SecurityProtocol, false);
+                    using (SslStream ssl = new SslStream(client.GetStream(), false, CertificateValidationCallback, null))
+                    {
+                        var SecurityProtocol = (SecurityProtocolType)MySecurityProtocolType.Tls | (SecurityProtocolType)MySecurityProtocolType.Tls11;
+                        ssl.AuthenticateAsClient(url, null, (System.Security.Authentication.SslProtocols)SecurityProtocol, false);
                         return "The current system does not disable the legacy TSL protocols (TLS1.0 or TLS1.1).";
-                     }
+                    }
                 }
                 catch (Exception)
                 {
@@ -1229,9 +1240,10 @@ namespace FusionDirectorPlugin.Service
             {
                 var url = $"https://{pluginConfig.InternetIp}:{pluginConfig.InternetPort}/AlarmReciver.ashx";
                 var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-                var res = httpClient.GetAsync(url).Result;
+                var res = await httpClient.GetAsync(url);
                 var success = res.StatusCode == HttpStatusCode.OK;
-                if (!success) {
+                if (!success)
+                {
                     var content = await res.Content.ReadAsStringAsync();
                     this.OnError($"IIS express index page is not correct responding, status code: {res.StatusCode}, response content: {content}");
                     res.EnsureSuccessStatusCode();
@@ -1254,17 +1266,17 @@ namespace FusionDirectorPlugin.Service
                 try
                 {
                     client.Connect(InternetIp, InternetPort);
-                    var CertificateValidationCallback =  new RemoteCertificateValidationCallback(
+                    var CertificateValidationCallback = new RemoteCertificateValidationCallback(
                         (object sender, X509Certificate certificate, X509Chain chain,
-                        SslPolicyErrors sslPolicyErrors) => sslPolicyErrors == SslPolicyErrors.None 
+                        SslPolicyErrors sslPolicyErrors) => sslPolicyErrors == SslPolicyErrors.None
                         || sslPolicyErrors == SslPolicyErrors.RemoteCertificateNameMismatch);
-                     using (SslStream ssl = new SslStream(client.GetStream(), false, CertificateValidationCallback, null)) 
-                     {
-                        var SecurityProtocol = (SecurityProtocolType) MySecurityProtocolType.Tls 
-                            | (SecurityProtocolType) MySecurityProtocolType.Tls11 | (SecurityProtocolType) MySecurityProtocolType.Tls12;
-                        ssl.AuthenticateAsClient(url, null, (System.Security.Authentication.SslProtocols) SecurityProtocol, false);
+                    using (SslStream ssl = new SslStream(client.GetStream(), false, CertificateValidationCallback, null))
+                    {
+                        var SecurityProtocol = (SecurityProtocolType)MySecurityProtocolType.Tls
+                            | (SecurityProtocolType)MySecurityProtocolType.Tls11 | (SecurityProtocolType)MySecurityProtocolType.Tls12;
+                        ssl.AuthenticateAsClient(url, null, (System.Security.Authentication.SslProtocols)SecurityProtocol, false);
                         cert = new X509Certificate2(ssl.RemoteCertificate);
-                     }
+                    }
                 }
                 catch (Exception e)
                 {
@@ -1352,7 +1364,7 @@ namespace FusionDirectorPlugin.Service
                 return sslPolicyErrors == SslPolicyErrors.None || sslPolicyErrors == SslPolicyErrors.RemoteCertificateNameMismatch;
             };
             //兼容所有ssl协议
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType) MySecurityProtocolType.Tls12;
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)MySecurityProtocolType.Tls12;
             ServicePointManager.DefaultConnectionLimit = 1000;
         }
 

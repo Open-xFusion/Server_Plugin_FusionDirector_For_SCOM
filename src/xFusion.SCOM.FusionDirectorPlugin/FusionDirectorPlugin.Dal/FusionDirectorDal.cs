@@ -55,7 +55,13 @@ namespace FusionDirectorPlugin.Dal
         /// <exception cref="System.Exception">ex</exception>
         public IList<FusionDirector> GetList()
         {
-            var monitoringObjects = FdApplianceConnector.Instance.All().Result.Data;
+            Result<List<EnterpriseManagementObject>> result = FdApplianceConnector.Instance.All().Result;
+            if (!result.Success)
+            {
+                HWLogger.Service.Error(result.Cause, result.Message);
+                throw new Exception(result.Message);
+            }
+            List<EnterpriseManagementObject> monitoringObjects = result.Data;
             return monitoringObjects.Select(GetModelFromMpObject).OrderByDescending(x => x.CreateTime).ToList();
         }
 
@@ -83,20 +89,27 @@ namespace FusionDirectorPlugin.Dal
         /// <param name="subscribeId">The subscribe identifier.</param>
         public void UpdateSubscribeStatus(string hostIP, string subscribeStatus, string latestSubscribeInfo, string subscribeId)
         {
-            var managementObject = FdApplianceConnector.Instance.FindByHost(hostIP).Result.Data;
-            if (managementObject != null)
+            try
             {
-                var props = FdApplianceConnector.Instance.FdApplianceClass.PropertyCollection;
-                managementObject[props["SubscribeId"]].Value = subscribeId;
-                managementObject[props["SubscribeStatus"]].Value = subscribeStatus;
-                managementObject[props["LatestSubscribeInfo"]].Value = latestSubscribeInfo;
-                managementObject[props["LastModifyTime"]].Value = DateTime.Now;
+                var managementObject = FdApplianceConnector.Instance.FindByHost(hostIP).Result.Data;
+                if (managementObject != null)
+                {
+                    var props = FdApplianceConnector.Instance.FdApplianceClass.PropertyCollection;
+                    managementObject[props["SubscribeId"]].Value = subscribeId;
+                    managementObject[props["SubscribeStatus"]].Value = subscribeStatus;
+                    managementObject[props["LatestSubscribeInfo"]].Value = latestSubscribeInfo;
+                    managementObject[props["LastModifyTime"]].Value = DateTime.Now;
 
-                managementObject.Overwrite();
+                    managementObject.Overwrite();
+                }
+                else
+                {
+                    HWLogger.Service.Warn($"Failed to update subscribe status for `{hostIP}`, reason is: FusionDirector appliance does not exists.");
+                }
             }
-            else
+            catch (Exception e)
             {
-                HWLogger.Service.Warn($"Failed to update subscribe status for `{hostIP}`, reason is: FusionDirector appliance does not exists.");
+                HWLogger.Service.Error(e, $"Failed to update subscribe status for `{hostIP}`, reason is: Exception.");
             }
         }
 

@@ -9,7 +9,6 @@
 //MIT license for more detail.
 //*************************************************************************  
 using System;
-using System.Linq;
 using System.Net.Http;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
@@ -37,9 +36,7 @@ namespace FusionDirectorPlugin.Model
             var url = $"{this.BaseUrl}/redfish/v1/EventService";
             try
             {
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                var responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<EventServiceRsp>(responseData);
             }
             catch (Exception e)
@@ -56,9 +53,7 @@ namespace FusionDirectorPlugin.Model
             var url = $"{this.BaseUrl}/redfish/v1/EventService/Subscriptions";
             try
             {
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                var responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<SubscriptionsRsp>(responseData);
             }
             catch (Exception e)
@@ -76,9 +71,7 @@ namespace FusionDirectorPlugin.Model
             string companyName = "Huawei";
             try
             {
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                var responseData = await BaseGetAsync(url);
                 JObject json = JsonConvert.DeserializeObject<JObject>(responseData);
                 if (json["Oem"] != null)
                 {
@@ -111,7 +104,7 @@ namespace FusionDirectorPlugin.Model
                 // 这里查询厂商名称, 改变入参厂商信息
                 var defaultCompany = "xFusion";
                 var companyName = await GetCompanyName();
-                JObject json = JObject.FromObject(body);                
+                JObject json = JObject.FromObject(body);
                 if (!defaultCompany.Equals(companyName))
                 {
                     JObject Oem = (JObject)json["Oem"];
@@ -150,9 +143,7 @@ namespace FusionDirectorPlugin.Model
                 {
                     throw new ArgumentNullException("id");
                 }
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                var responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<SubscriptionInfo>(responseData);
             }
             catch (Exception e)
@@ -268,9 +259,7 @@ namespace FusionDirectorPlugin.Model
                 }
 
                 url = url.TrimEnd('?').TrimEnd('&');
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                var responseData = await BaseGetAsync(url, 2);
                 return JsonConvert.DeserializeObject<EventList>(responseData);
             }
             catch (Exception e)
@@ -293,8 +282,7 @@ namespace FusionDirectorPlugin.Model
                     throw new ArgumentNullException("id");
                 }
                 url = url.Replace("{id}", Uri.EscapeDataString(id));
-                var response = await httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<EventInfo>(responseData);
             }
             catch (Exception e)

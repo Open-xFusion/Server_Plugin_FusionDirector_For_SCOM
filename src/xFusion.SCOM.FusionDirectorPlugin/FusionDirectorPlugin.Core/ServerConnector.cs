@@ -123,7 +123,7 @@ namespace FusionDirectorPlugin.Core
                 #endregion
 
                 discoveryData.Commit(this.MontioringConnector);
-                HWLogger.GetFdSdkLogger(model.FusionDirectorIp).Debug($"Insert Server Finish:{model.UnionId}");
+                HWLogger.GetFdSdkLogger(model.FusionDirectorIp).Info($"Insert Server Finish:{model.UnionId}");
             }
             catch (Exception e)
             {
@@ -154,7 +154,7 @@ namespace FusionDirectorPlugin.Core
                     UpdateServer(model, exsitServer);
                     discoveryData.Add(exsitServer);
                     discoveryData.Overwrite(this.MontioringConnector);
-                    HWLogger.GetFdSdkLogger(model.FusionDirectorIp).Info($"Update server finish:{model.UnionId}");
+                    HWLogger.GetFdSdkLogger(model.FusionDirectorIp).Info($"Update server finish:{model.UnionId} [isPolling:{isPolling}]");
                 }
 
             }

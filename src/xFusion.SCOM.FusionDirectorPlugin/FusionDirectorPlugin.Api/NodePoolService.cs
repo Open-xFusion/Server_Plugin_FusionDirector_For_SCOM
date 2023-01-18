@@ -81,9 +81,7 @@ namespace FusionDirectorPlugin.Api
                     url += $"top={Uri.EscapeDataString(top.Value.ToString())}&";
                 }
                 url = url.TrimEnd('?').TrimEnd('&');
-                var response = await this.httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false); this.ProcessResponse(url, response, responseData);
-                this.ProcessResponse(url, response, responseData, "Debug");
+                var responseData = await BaseGetAsync(url, 2);
                 return JsonConvert.DeserializeObject<ServerList>(responseData);
             }
             catch (Exception e)
@@ -109,9 +107,7 @@ namespace FusionDirectorPlugin.Api
                 }
                 url = url.Replace("{id}", Uri.EscapeDataString(id));
 
-                var response = await this.httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                var responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<Server>(responseData);
             }
             catch (Exception e)
@@ -136,9 +132,7 @@ namespace FusionDirectorPlugin.Api
                     throw new ArgumentNullException("id");
                 }
                 url = url.Replace("{id}", Uri.EscapeDataString(id));
-                var response = await this.httpClient.GetAsync(url);
-                var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                this.ProcessResponse(url, response, responseData);
+                var responseData = await BaseGetAsync(url);
                 return JsonConvert.DeserializeObject<ServerManagerCollection>(responseData);
             }
             catch (Exception e)
