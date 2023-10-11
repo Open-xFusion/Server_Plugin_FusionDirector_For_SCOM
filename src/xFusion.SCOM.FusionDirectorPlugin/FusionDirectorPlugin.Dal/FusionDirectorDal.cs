@@ -62,7 +62,7 @@ namespace FusionDirectorPlugin.Dal
                 throw new Exception(result.Message);
             }
             List<EnterpriseManagementObject> monitoringObjects = result.Data;
-            return monitoringObjects.Select(GetModelFromMpObject).OrderByDescending(x => x.CreateTime).ToList();
+            return monitoringObjects.Select(GetModelFromMpObject).OrderBy(x => x.CreateTime).ToList();
         }
 
         /// <summary>

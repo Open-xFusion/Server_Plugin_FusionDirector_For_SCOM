@@ -128,8 +128,6 @@ namespace FusionDirectorPlugin.WebServer
                                 var resData = new byte[256];
                                 var bytes = ns.Read(resData, 0, resData.Length);
                                 var result = Encoding.UTF8.GetString(resData, 0, bytes);
-
-                                //HwLogger.NotifyRecv.Debug($"SendMsgResult Id:{msg.Id} result:{result}");
                             }
                         }
                         catch (Exception ex)

@@ -9,7 +9,7 @@ I. General Information
 
     Name:     XFUSION_FusionDirector_For_SCOM plugin
     Category: Monitoring, Alarm
-    version : 1.0.18
+    version : 1.0.19
     
 II. Function Description
     

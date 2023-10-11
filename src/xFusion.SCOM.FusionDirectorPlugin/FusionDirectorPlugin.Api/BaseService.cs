@@ -24,7 +24,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
@@ -32,10 +31,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using FusionDirectorPlugin.Dal;
 using FusionDirectorPlugin.Dal.Model;
 using FusionDirectorPlugin.LogUtil;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NLog;
 
 namespace FusionDirectorPlugin.Api
@@ -211,10 +210,34 @@ namespace FusionDirectorPlugin.Api
 
         public void Dispose()
         {
-            if (this.httpClient != null)
+            this.httpClient?.Dispose();
+        }
+
+
+        /// <summary>
+        /// 公共PostAsync方法
+        /// </summary>
+        /// <param name="url">url</param>
+        /// <param name="json">json data</param>
+        /// <param name="sleepTime">sleep time</param>
+        /// <returns>System.String.</returns>
+        public async Task<string> BasePostAsync(string url, JObject json, double sleepTime = 1)
+        {
+            var content = new StringContent(JsonConvert.SerializeObject(json));
+            var response = await httpClient.PostAsync(url, content);
+
+            int tryTimes = 0;
+            // 大量请求时，FD会返回code 429，尝试重试
+            while ((int)response.StatusCode == 429 && tryTimes < 20)
             {
-                this.httpClient.Dispose();
+                tryTimes++;
+                Thread.Sleep(TimeSpan.FromSeconds(sleepTime));
+                response = await httpClient.PostAsync(url, content);
             }
+
+            var responseData = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            this.ProcessResponse(url, response, data: responseData);
+            return responseData;
         }
 
         /**

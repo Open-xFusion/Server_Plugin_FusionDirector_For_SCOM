@@ -222,10 +222,14 @@ namespace FusionDirectorPlugin.Model
             }
         }
 
-        public async Task<EventList> GetEventView(long? top, long? skip)
+        public async Task<EventList> GetEventView(long? top, long? skip, string deviceId)
         {
             string filter = "(EventView='CurrentAlert')and(EventSearch='event_category:BMC','event_category:Enclosure')";
             string order = "(EventOrder='ID asc')";
+            if (!string.IsNullOrEmpty(deviceId)) 
+            {
+                filter += $"and(EventSource='{deviceId}')";
+            }
             return await GetEventListCollectionAsync(top, skip, filter, order);
         }
 

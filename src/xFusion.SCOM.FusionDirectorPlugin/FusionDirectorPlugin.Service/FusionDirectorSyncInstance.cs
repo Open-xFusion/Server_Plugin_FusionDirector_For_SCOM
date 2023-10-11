@@ -33,7 +33,6 @@ using FusionDirectorPlugin.Model;
 
 using System.Linq;
 using System.Threading;
-using FusionDirectorPlugin.Dal.Helpers;
 using FusionDirectorPlugin.Model.Event;
 using Newtonsoft.Json;
 using Timer = System.Timers.Timer;
@@ -87,7 +86,6 @@ namespace FusionDirectorPlugin.Service
             this.AlarmDatas = new Queue<AlarmData>();
             this.AlarmQueue = new Queue<AlarmData>();
             this.StartAlarmEventProcessor();
-            // this.RunInsertEventTask();
 
             this.UpdateServerTasks = new List<UpdateTask<Server>>();
             this.UpdateEnclosureTasks = new List<UpdateTask<Enclosure>>();
@@ -100,9 +98,6 @@ namespace FusionDirectorPlugin.Service
 
         public void UpdateFusionDirector(FusionDirector fusionDirector)
         {
-            // TODO(qianbiao.ng) can we dispose clients directly here? what if it's used by other threads?
-            // this.DisposeFusionDirectorClients();
-
             this.FusionDirector = fusionDirector;
             this.enclosureService = new EnclosureService(fusionDirector);
             this.fusionDirectorService = new FusionDirectorService(fusionDirector);
@@ -177,11 +172,8 @@ namespace FusionDirectorPlugin.Service
             }
             // 清除完成的任务
             this.taskList.Clear();
-            var syncEnclosureListTask = this.SyncEnclosureList(taskId);
-            this.taskList.Add(syncEnclosureListTask);
-            var syncServerListTask = this.SyncServerList(taskId);
-            this.taskList.Add(syncServerListTask);
-
+            this.SyncEnclosureList(taskId);
+            this.SyncServerList(taskId);
             WaitAndStartSyncOpenAlertsIfNeccessary();
         }
 
@@ -224,39 +216,36 @@ namespace FusionDirectorPlugin.Service
 
         #region 机框
 
-        private Task SyncEnclosureList(string taskId)
+        private void SyncEnclosureList(string taskId)
         {
             logger.Polling.Info($"[{taskId}]Start Polling Enclosure Task.");
             logger.Sdk.Info($"[{taskId}]Start Polling Enclosure Task.");
-            return Task.Run(async () =>
-             {
-                 try
-                 {
-                     var result = await this.enclosureService.GetEnclosureCollectionAsync(null, null, null, null);
+            try
+            {
+                var result = this.enclosureService.GetEnclosureCollectionAsync(null, null, null, null).Result;
 
-                     //删除不存在的Enclosure
-                     var newDeviceIds = result.Members.Select(x => $"{this.FusionDirectorIp}-{x.UUID}").ToList();
-                     logger.Polling.Debug($"[{taskId}]SyncEnclosureList Finish.[{string.Join(",", newDeviceIds).Replace($"{this.FusionDirectorIp}-", "")}]");
-                     EnclosureConnector.Instance.CompareDataOnSync(this.FusionDirectorIp, newDeviceIds);
+                //删除不存在的Enclosure
+                var newDeviceIds = result.Members.Select(x => $"{this.FusionDirectorIp}-{x.UUID}").ToList();
+                logger.Polling.Debug($"[{taskId}]SyncEnclosureList Finish.[{string.Join(",", newDeviceIds).Replace($"{this.FusionDirectorIp}-", "")}]");
+                EnclosureConnector.Instance.CompareDataOnSync(this.FusionDirectorIp, newDeviceIds);
 
-                     //开始同步详情
-                     foreach (var x in result.Members)
-                     {
-                         var task = taskFactory.StartNew(() =>
-                         {
-                             var enclosure = this.QueryEnclosureDetails(x).Result;
-                             logger.Polling.Debug($"[{taskId}]Query Enclosure Finish:[{JsonConvert.SerializeObject(enclosure)}].");
-                             EnclosureConnector.Instance.Sync(enclosure).Wait();
-                         }, cts.Token);
-                         this.taskList.Add(task);
-                         Thread.Sleep(TimeSpan.FromSeconds(1));
-                     }
-                 }
-                 catch (Exception ex)
-                 {
-                     OnPollingError($"[{taskId}]SyncEnclosureList Error.FusionDirector:{this.FusionDirectorIp} ", ex);
-                 }
-             });
+                //开始同步详情
+                foreach (var x in result.Members)
+                {
+                    var task = taskFactory.StartNew(() =>
+                    {
+                        var enclosure = this.QueryEnclosureDetails(x).Result;
+                        logger.Polling.Debug($"[{taskId}]Query Enclosure Finish:[{JsonConvert.SerializeObject(enclosure)}].");
+                        EnclosureConnector.Instance.Sync(enclosure).Wait();
+                    }, cts.Token);
+                    this.taskList.Add(task);
+                    Thread.Sleep(TimeSpan.FromMilliseconds(200));
+                }
+            }
+            catch (Exception ex)
+            {
+                OnPollingError($"[{taskId}]SyncEnclosureList Error.FusionDirector:{this.FusionDirectorIp} ", ex);
+            }
         }
 
         private async Task<Enclosure> QueryEnclosureDetails(EnclosureSummary enclosureSummary)
@@ -289,44 +278,47 @@ namespace FusionDirectorPlugin.Service
         #endregion
 
         #region Server
-        private Task SyncServerList(string taskId)
+        private void SyncServerList(string taskId)
         {
             logger.Polling.Info($"[{taskId}]Start Polling Server Task.");
             logger.Sdk.Info($"[{taskId}]Start Polling Server Task.");
-            return Task.Run(async () =>
+
+            try
             {
-                try
+                // 限制数量
+                int limitQuantity = FusionDirectorPluginService.MAX_SERVER_COUNT - FusionDirectorPluginService.dealServerCount();
+                List<ServerSummary> serverList = new List<ServerSummary>();
+                if (limitQuantity <= 0)
                 {
-                    var result = await this.nodePoolService.GetServerCollectionAsync(null, null, null, null, null);
+                    logger.Sdk.Warn($"[{taskId}]SyncServerList limitQuantity:{limitQuantity} <= 0, FusionDirector:{this.FusionDirectorIp}");
+                }
+                else
+                {
+                    ServerList result = this.nodePoolService.GetAllServerAsync(null, null, null, limitQuantity).Result;
+                    serverList = result.Members;
+                    logger.Sdk.Info($"[{taskId}]SyncServerList start.[LimitQuantity:{limitQuantity}, ServerCount:{serverList.Count}, TotalCount:{result.Membersodatacount}]");
+                }
 
-                    //var serverList = result.Members.Where(x => x.ServerState.ToUpper() == "READY").ToList();
-                    var serverList = result.Members;
-
-                    //删除不存在的server
-                    var newDeviceIds = serverList.Select(x => $"{this.FusionDirectorIp}-{x.Id}").ToList();
-                    logger.Polling.Debug($"[{taskId}]SyncServerList Finish.[{string.Join(",", newDeviceIds).Replace($"{this.FusionDirectorIp}-", "")}]");
-                    ServerConnector.Instance.CompareDataOnSync(this.FusionDirectorIp, newDeviceIds);
-
-                    foreach (var x in serverList)
+                FusionDirectorPluginService.dealServerCount("add", this.FusionDirectorIp, serverList.Count());
+                // 删除不存在的server
+                var newDeviceIds = serverList.Select(selector: x => $"{this.FusionDirectorIp}-{x.Id}").ToList();
+                ServerConnector.Instance.CompareDataOnSync(this.FusionDirectorIp, newDeviceIds);
+                foreach (var x in serverList)
+                {
+                    var task = taskFactory.StartNew(async () =>
                     {
-                        var task = taskFactory.StartNew(async () =>
-                        {
-                            Server server = await QueryServerDetails(x);
-                            await ServerConnector.Instance.Sync(server);
-                            if (server.ServerState.ToUpper() == "READY")
-                            {
-                                DealServerPerformance(x).Wait();
-                            }
-                        }, cts.Token);
-                        this.taskList.Add(task);
-                        Thread.Sleep(TimeSpan.FromSeconds(1));
-                    }
+                        Server server = await QueryServerDetails(x);
+                        await ServerConnector.Instance.Sync(server);
+                    }, cts.Token);
+                    this.taskList.Add(item: task);
+                    Thread.Sleep(timeout: TimeSpan.FromMilliseconds(200));
                 }
-                catch (Exception ex)
-                {
-                    OnPollingError($"[{taskId}]SyncServerList Error.FusionDirector:{this.FusionDirectorIp} ", ex);
-                }
-            });
+                logger.Sdk.Info($"[{taskId}]SyncServerList end.[Server Count:{serverList.Count}, FusionDirector:{this.FusionDirectorIp}]");
+            }
+            catch (Exception ex)
+            {
+                OnPollingError($"[{taskId}]SyncServerList Error.FusionDirector:{this.FusionDirectorIp} ", ex);
+            }
         }
 
         /// <summary>
@@ -409,13 +401,15 @@ namespace FusionDirectorPlugin.Service
             logger.Sdk.Info($"Start Server Performance Collect Task.");
             try
             {
-                var result = await this.nodePoolService.GetServerCollectionAsync(null, null, null, null, null);
+                ServerList result = await this.nodePoolService.GetAllServerAsync(null, null, null, FusionDirectorPluginService.MAX_SERVER_COUNT);
                 var serverList = result.Members.Where(x => x.State.ToUpper() == "READY").ToList();
+                logger.Sdk.Info($"RunSyncServerPerformance start.[Server Count:{serverList.Count}, totalCount:{result.Membersodatacount}]");
                 foreach (var x in serverList)
                 {
                     await DealServerPerformance(x);
-                    Thread.Sleep(TimeSpan.FromSeconds(1));
+                    Thread.Sleep(timeout: TimeSpan.FromMilliseconds(200));
                 }
+                logger.Sdk.Info($"RunSyncServerPerformance end.[Server Count:{serverList.Count}, totalCount:{result.Membersodatacount}]");
             }
             catch (Exception ex)
             {

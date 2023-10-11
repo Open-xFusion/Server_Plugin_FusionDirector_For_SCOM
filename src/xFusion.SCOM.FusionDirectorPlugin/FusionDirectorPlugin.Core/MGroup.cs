@@ -343,7 +343,7 @@ namespace FusionDirectorPlugin.Core
 
             var criteria = new ManagementPackCriteria($"Name = '{newMp.Name}'");
             var oldMp = this.ManagementPacks.GetManagementPacks(criteria).FirstOrDefault();
-            if (oldMp != null)
+            if (oldMp != null && oldMp.Version >= newMp.Version)
             {
                 HWLogger.Install.Warn($"Skip install：{oldMp.Name}-{oldMp.Version} has Installed.");
             }
