@@ -38,9 +38,13 @@ using FusionDirectorPlugin.Dal;
 using FusionDirectorPlugin.Dal.Helpers;
 using FusionDirectorPlugin.Dal.Model;
 using FusionDirectorPlugin.LogUtil;
+using FusionDirectorPlugin.ViewLib.Model;
+using FusionDirectorPlugin.ViewLib.Utils;
 using Microsoft.EnterpriseManagement.Packaging;
+using Microsoft.EnterpriseManagement.Common;
 using FusionDirectorPlugin.Model;
 using System.Security.Cryptography.X509Certificates;
+using Result = FusionDirectorPlugin.ViewLib.Model.Result;
 
 namespace FusionDirectorPlugin.PackageHelper
 {
@@ -111,7 +115,6 @@ namespace FusionDirectorPlugin.PackageHelper
                     Directory.CreateDirectory(tempFilePath);
                 }
                 ScomInstallPath = ReadScomInstallPath();
-                //CreateConfigLibraryMp();
 #if DEBUG
                 //ReadScomInstallPath();
                 //ResetSubscribeStatus();
@@ -166,10 +169,25 @@ namespace FusionDirectorPlugin.PackageHelper
                     Install();
                     OnLog("PackageHelper work done.");
                 }
+                else if (args[0] == "/upgrade")
+                {
+                    OnLog("Start upgrade...");
+                    Upgrade();
+                    OnLog("Upgrade complete.");
+                }
+                else if (args[0] == "/restore")
+                {
+                    OnLog("Start restore...");
+                    bool restoreMp = GetAttrValue(args, "restoreMp");
+                    Restore(restoreMp);
+                    OnLog("Restore complete.");
+                }
                 else if (args[0] == "/h")
                 {
                     OnLog("/i install");
                     OnLog("/u uninstall");
+                    OnLog("/upgrade upgrade");
+                    OnLog("/restore restore");
                     Console.ReadLine();
                 }
 #endif
@@ -231,6 +249,138 @@ namespace FusionDirectorPlugin.PackageHelper
             UnInstallConnector();
             UnInstallMpPlugin();
             UnInstallCerts();
+        }
+
+        /// <summary>
+        /// The upgrade.
+        /// </summary>
+        private static void Upgrade()
+        {
+            UnInstallService();
+            try
+            {
+                InstallService();
+            }
+            catch(Exception ex)
+            {
+                OnLog("Upgrade failed. Start restoring to the original version.", ex);
+                Environment.Exit(-1);
+            }
+            try
+            {
+                InstallMpPlugin();
+            }
+            catch (Exception ex)
+            {
+                OnLog("Upgrade failed. Start restoring to the original version.", ex);
+                Environment.Exit(-2);
+            }
+        }
+
+        /// <summary>
+        /// The restore.
+        /// </summary>
+        private static void Restore(bool restoreMp)
+        {
+            try
+            {
+                UnInstallService();
+                InstallService(true);
+                if (restoreMp)
+                {
+                    RestoreMp();
+                }
+            }
+            catch (Exception ex)
+            {
+                OnLog("Restore failed", ex);
+                throw ex;
+            }
+        }
+
+        /// <summary>
+        /// Restore ManagementPacks.
+        /// </summary>
+        private static void RestoreMp()
+        {
+            try
+            {
+                Task<Result<List<EnterpriseManagementObject>>> getALLFdTask = ViewLib.OM12R2.FdApplianceConnector.Instance.All();
+                bool isGetALLFdTaskSucess = getALLFdTask.Wait(TimeSpan.FromMinutes(1));
+
+                OnLog("Start restore management pack...");
+                UnInstallMpPlugin();
+                InstallMpPlugin();
+                OnLog("Restore management pack complete");
+
+                if (isGetALLFdTaskSucess && getALLFdTask.Result.Success)
+                {
+                    RestoreFd(getALLFdTask.Result.Data);
+                }
+                else
+                {
+                    HWLogger.Install.Error("Get FusionDirectors task failed.");
+                }
+            }
+            catch (Exception ex)
+            {
+                OnLog("Restore ManagementPacks failed", ex);
+                throw ex;
+            }
+        }
+
+        /// <summary>
+        /// Restore FusionDirector.
+        /// </summary>
+        /// <param name="AllFd">Fd List.</param>
+        private static void RestoreFd(List<EnterpriseManagementObject> AllFd)
+        {
+            try
+            {
+                List<FdAppliance> FdAppliances = AllFd.Select(x => GetModelFromMpObject(x)).ToList();
+                OnLog("Start restore FusionDirectors...");
+                foreach (FdAppliance appliance in FdAppliances)
+                {
+                    Task<Result> addFdTask = ViewLib.OM12R2.FdApplianceConnector.Instance.Add(appliance);
+                    if (addFdTask.Wait(TimeSpan.FromMinutes(1)) && addFdTask.Result.Success)
+                    {
+                        OnLog("Restore FusionDirector " + appliance.HostIP + ":" + appliance.Port + " success.");
+                    }
+                    else
+                    {
+                        HWLogger.Install.Error("Restore FusionDirector " + appliance.HostIP + ":" + appliance.Port + " failed.");
+                    }
+                }
+                OnLog("Restore FusionDirectors complete");
+            }
+            catch (Exception ex)
+            {
+                OnLog("Restore FusionDirectors failed", ex);
+            }
+        }
+
+        /// <summary>
+        /// Gets the model from mp object.
+        /// </summary>
+        /// <param name="managementObject">The management object.</param>
+        /// <returns>FdAppliance.</returns>
+        private static FdAppliance GetModelFromMpObject(EnterpriseManagementObject managementObject)
+        {
+            var props = ViewLib.OM12R2.FdApplianceConnector.Instance.FdApplianceClass.PropertyCollection;
+            var model = new FdAppliance();
+            model.HostIP = managementObject[props["HostIP"]].Value.ToString();
+            model.AliasName = managementObject[props["AliasName"]].Value.ToString();
+            model.LoginAccount = managementObject[props["LoginAccount"]].Value.ToString();
+            model.LoginPd = RijndaelManagedCrypto.Instance.DecryptFromCs(managementObject[props["LoginPd"]].Value.ToString());
+            model.Port = managementObject[props["Port"]].Value.ToString();
+            model.EventUserName = managementObject[props["EventUserName"]].Value.ToString();
+            model.EventPd = RijndaelManagedCrypto.Instance.DecryptFromCs(managementObject[props["EventPd"]].Value.ToString());
+            model.SubscribeId = managementObject[props["SubscribeId"]].Value.ToString();
+            model.SubscribeStatus = managementObject[props["SubscribeStatus"]].Value.ToString();
+            model.LatestSubscribeInfo = managementObject[props["LatestSubscribeInfo"]].Value.ToString();
+            model.LastModifyTime = Convert.ToDateTime(managementObject[props["LastModifyTime"]].Value.ToString());
+            model.CreateTime = Convert.ToDateTime(managementObject[props["CreateTime"]].Value.ToString());
+            return model;
         }
 
         #region Install
@@ -380,18 +530,19 @@ namespace FusionDirectorPlugin.PackageHelper
         /// <summary>
         /// The install service.
         /// </summary>
-        private static void InstallService()
+        private static void InstallService(bool isRestore=false)
         {
             try
             {
                 OnLog($"Install {PluginServiceName} as Windows Service");
+                String servicePath = isRestore ? Path.GetFullPath("..\\Configuration") : RunPath;
                 var process = new Process
                 {
                     StartInfo =
                     {
                         FileName = $"{FrameworkInstallDir}\\InstallUtil.exe",
                         Arguments =
-                            $" \"{RunPath}\\FusionDirectorPlugin.Service.exe\"",
+                            $" \"{servicePath}\\FusionDirectorPlugin.Service.exe\"",
                         WindowStyle = ProcessWindowStyle.Hidden,
                         UseShellExecute = false,
                         RedirectStandardInput = true,

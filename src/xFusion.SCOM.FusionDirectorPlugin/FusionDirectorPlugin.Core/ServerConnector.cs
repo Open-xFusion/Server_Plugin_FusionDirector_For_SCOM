@@ -88,7 +88,8 @@ namespace FusionDirectorPlugin.Core
         /// Synchronizes the specified model.
         /// </summary>
         /// <param name="model">The model.</param>
-        public Task Sync(Server model)
+        /// <param name="isAllowInsert">is Allow Insert.</param>
+        public Task Sync(Server model, Boolean isAllowInsert = true)
         {
             return Task.Run(() =>
             {
@@ -97,9 +98,11 @@ namespace FusionDirectorPlugin.Core
                 {
                     this.Update(model, true);
                 }
-                else
+                else if (isAllowInsert)
                 {
                     this.Insert(model);
+                } else {
+                    HWLogger.GetFdSdkLogger(model.FusionDirectorIp).Warn($"Insert server failed, not allowed:{model.UnionId}");
                 }
             });
         }
@@ -352,7 +355,6 @@ namespace FusionDirectorPlugin.Core
             try
             {
                 MGroup.Instance.CheckConnection();
-                HWLogger.GetFdSdkLogger(fdIp).Debug($"Compare Data On Polling.[curQueryResult:{string.Join(",", newIds)}]");
                 var criteria = new MonitoringObjectCriteria($"Name like '%{fdIp}%'", ServerClass);
 
                 var exsitObjects = MGroup.Instance.EntityObjects.GetObjectReader<MonitoringObject>(criteria, ObjectQueryOptions.Default).ToList();
@@ -367,7 +369,7 @@ namespace FusionDirectorPlugin.Core
                     discovery.Remove(deleteDevice);
                 });
                 discovery.Commit(this.MontioringConnector);
-                HWLogger.GetFdSdkLogger(fdIp).Debug($"Remove Server Polling:[Count:{deleteObjects.Count}].[{string.Join(",", deleteObjects.Select(x => x[ServerKey].Value.ToString()))}]");
+                HWLogger.GetFdSdkLogger(fdIp).Info($"Compare Servers End:[new:{newObjects.Count}] [Delete:{deleteObjects.Count}]");
             }
             catch (Exception e)
             {

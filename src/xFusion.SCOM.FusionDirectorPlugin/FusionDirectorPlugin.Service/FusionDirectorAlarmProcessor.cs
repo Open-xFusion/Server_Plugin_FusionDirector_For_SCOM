@@ -89,6 +89,7 @@ namespace FusionDirectorPlugin.Service
                             Thread.Sleep(TimeSpan.FromSeconds(30));
                             continue;
                         }
+
                         AlarmData alarm = null;
                         try
                         {
@@ -100,7 +101,7 @@ namespace FusionDirectorPlugin.Service
                                 }
                             }
                             DealAlarm(alarm);
-                            Thread.Sleep(TimeSpan.FromSeconds(1));
+                            Thread.Sleep(TimeSpan.FromMilliseconds(200));
                         }
                         catch (Exception e)
                         {
@@ -330,27 +331,6 @@ namespace FusionDirectorPlugin.Service
                     logger.Polling.Info($"Current health state for device `{obj.DeviceId}` is {obj.Device.HealthState}");
                 }
             }
-
-            /**
-            while (!device.IsAvailable)
-            {
-                this.logger.Polling.Info($"MonitoringObject({obj.DeviceId}) is not monitoring.");
-                this.logger.Polling.Info($"     Device added time is: {device.TimeAdded}.");
-                this.logger.Polling.Info($"     Device last modified time is: {device.LastModified}.");
-                this.logger.Polling.Info($"     Device availability last modified time is: {device.AvailabilityLastModified}.");
-
-                var availableLastModified = device.AvailabilityLastModified.HasValue ? device.AvailabilityLastModified.Value : device.LastModified;
-                TimeSpan availableNotChangedTimeLong = DateTime.UtcNow - availableLastModified;
-                // the interval of monitor for our object is 5 minutes. So we will wait 5m.
-                if (availableNotChangedTimeLong <= expectTimeLong)
-                {
-                    Thread.Sleep(expectTimeLong - availableNotChangedTimeLong);
-                }
-
-                obj.Reload();
-                logger.Polling.Info($"Current health state for device `{obj.DeviceId}` is {obj.Device.HealthState}");
-            }*/
-
             return true;
         }
         #endregion
@@ -379,7 +359,7 @@ namespace FusionDirectorPlugin.Service
             {
                 try
                 {
-                    Model.EventList eventView = await eventService.GetEventView(100, (currentPage - 1) * 100);
+                    Model.EventList eventView = await eventService.GetEventView(100, (currentPage - 1) * 100, null);
                     totalPages = (eventView.MembersCount / 100) + (eventView.MembersCount % 100 == 0 ? 0 : 1);
 
                     allOpenAlarms.AddRange(eventView.Members);

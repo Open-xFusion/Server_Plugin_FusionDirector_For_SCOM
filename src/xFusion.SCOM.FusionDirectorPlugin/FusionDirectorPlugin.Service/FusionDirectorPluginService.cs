@@ -38,7 +38,6 @@ using System.Text;
 using System.Threading;
 using FusionDirectorPlugin.Core;
 using FusionDirectorPlugin.Dal;
-using FusionDirectorPlugin.Dal.Helpers;
 using FusionDirectorPlugin.Dal.Model;
 using FusionDirectorPlugin.LogUtil;
 using Timer = System.Timers.Timer;
@@ -77,6 +76,46 @@ namespace FusionDirectorPlugin.Service
         private object lockRefreshPwds = new object();
 
         private PluginConfig pluginConfig;
+
+        /// <summary>
+        /// 最多管理1000台服务器
+        /// </summary>
+        public static readonly int MAX_SERVER_COUNT = 1000;
+
+        private static readonly Object lockServerCount = new object();
+
+        private static Dictionary<string, int> serverCountMap = new Dictionary<string, int>();
+
+        /// <summary>
+        ///   加锁执行
+        /// </summary>
+        public static int dealServerCount(string type = "", string fdIp = "", int count = 0)
+        {
+            lock (lockServerCount)
+            {
+                switch(type)
+                {
+                    case "add":
+                        serverCountMap.Remove(fdIp);
+                        serverCountMap.Add(fdIp, count);
+                        break;
+                    case "remove":
+                        serverCountMap.Remove(fdIp);
+                        break;
+                    case "clear":
+                        serverCountMap.Clear();
+                        break;
+                    default:
+                        break;
+                }
+                int serverCount = 0;
+                for (int i = 0; i < serverCountMap.Count; i++)
+                {
+                    serverCount += serverCountMap.Values.ElementAt(i);
+                }
+                return serverCount;
+            }
+        }
 
         #region Constructor
 
@@ -307,15 +346,14 @@ namespace FusionDirectorPlugin.Service
             //this.CheckAndInstallMp();
             this.RunCheckApplianceTask();
 
-
             this.RunWebServer();
 
             this.TcpServerTask = Task.Run(() => this.CreateTcpServer());
 
             this.InitialWindowEventLog();
-#if !DEBUG
+
             this.RunPolling();
-#endif
+
             this.RunSync(); // 先执行一次 
 
             this.RunCheckFdChangesTask();
@@ -328,44 +366,10 @@ namespace FusionDirectorPlugin.Service
         }
 
         /// <summary>
-        /// Checks the and install mp.
-        /// </summary>
-        private void CheckAndInstallMp()
-        {
-#if DEBUG
-
-#else
-            if (!MGroup.Instance.CheckIsInstallMp("xFusion.FusionDirector.View.Library"))
-            {
-                string path = $"{this.InstallPath}\\MPFiles\\xFusion.FusionDirector.View.Library.mpb";
-                MGroup.Instance.InstallMpb(path);
-            }
-            if (!MGroup.Instance.CheckIsInstallMp("xFusion.FusionDirector.Server.Library"))
-            {
-                string path = $"{this.InstallPath}\\MPFiles\\xFusion.FusionDirector.Server.Library.mpb";
-                MGroup.Instance.InstallMpb(path);
-            }
-            if (!MGroup.Instance.CheckIsInstallMp("xFusion.FusionDirector.Enclosure.Library"))
-            {
-                string path = $"{this.InstallPath}\\MPFiles\\xFusion.FusionDirector.Enclosure.Library.mpb";
-                MGroup.Instance.InstallMpb(path);
-            }
-#endif
-        }
-
-        /// <summary>
         /// 开始轮询
         /// </summary>
         private void RunPolling()
         {
-#if DEBUG
-            this.pollingTimer = new Timer(5 * 60 * 1000) { Enabled = true, AutoReset = true };
-            this.pollingTimer.Elapsed += (s, e) =>
-            {
-                this.RunSync();
-            };
-            this.pollingTimer.Start();
-#else
             var config = ConfigHelper.GetPluginConfig();
             this.pollingTimer = new Timer(config.PollingInterval)
             {
@@ -373,12 +377,12 @@ namespace FusionDirectorPlugin.Service
                 AutoReset = true,
             };
             this.pollingTimer.Elapsed += (s, e) =>
-                {
-                    this.RunCheckApplianceTask();
-                    this.RunSync();
-                };
+            {
+                this.RunCheckApplianceTask();
+                this.RunSync();
+            };
             this.pollingTimer.Start();
-#endif
+
             this.checkApplianceTimer = new Timer(15 * 60 * 1000)
             {
                 Enabled = true,
@@ -414,10 +418,14 @@ namespace FusionDirectorPlugin.Service
                 if (fdList != null)
                 {
                     this.OnLog($"fdList Count :{fdList.Count}");
+                    FusionDirectorPluginService.dealServerCount("clear");
                     foreach (var x in fdList)
                     {
+                        this.OnLog($"RunSync[{x.HostIP}] Start.");
                         var instance = this.FindInstance(x);
                         instance.Sync();
+                        int count = serverCountMap.ContainsKey(x.HostIP) ? serverCountMap[x.HostIP] : 0;
+                        this.OnLog($"RunSync[{x.HostIP}] End, ServerCount:{count}");
                     }
                 }
                 else
@@ -702,10 +710,12 @@ namespace FusionDirectorPlugin.Service
                             Thread.Sleep(TimeSpan.FromSeconds(2));
                             EnclosureConnector.Instance.RemoveEnclosureByFd(fdIp);
                             ServerConnector.Instance.RemoveServerByFd(fdIp);
+                            FusionDirectorPluginService.dealServerCount("remove", fdIp);
+                            HWLogger.GetFdSdkLogger(fdIp).Info($"Remove FusionDirector:{fdIp}, ServerCount:{FusionDirectorPluginService.dealServerCount()}");
                         }
                         catch (Exception e)
                         {
-                            HWLogger.GetFdNotifyLogger(fdIp).Error(e, $"delete this FusionDirector：");
+                            HWLogger.GetFdSdkLogger(fdIp).Error(e, $"delete this FusionDirector：");
                         }
                         isFinish = true;
                     }
@@ -1098,7 +1108,7 @@ namespace FusionDirectorPlugin.Service
                     {
                         var SecurityProtocol = (SecurityProtocolType)MySecurityProtocolType.Tls | (SecurityProtocolType)MySecurityProtocolType.Tls11;
                         ssl.AuthenticateAsClient(url, null, (System.Security.Authentication.SslProtocols)SecurityProtocol, false);
-                        return "The current system does not disable the legacy TSL protocols (TLS1.0 or TLS1.1).";
+                        return "The current system does not disable the legacy TLS protocols (TLS1.0 or TLS1.1).";
                     }
                 }
                 catch (Exception)

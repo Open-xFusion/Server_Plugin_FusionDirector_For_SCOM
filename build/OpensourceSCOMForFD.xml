@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <dependencies>
+        <dependency>
+            <artifactType>opensource</artifactType>
+            <artifactId>NLog - Advanced .NET Logging</artifactId>
+            <version>4.7.10</version>
+            <package>nlog.4.7.10.nupkg</package>
+            <dest>open_source/NLog</dest>
+        </dependency>
+        <dependency>
+            <artifactType>opensource</artifactType>
+            <artifactId>Newtonsoft.Json</artifactId>
+            <version>13.0.1</version>
+            <package>newtonsoft.json.13.0.1.nupkg</package>
+            <dest>open_source/Newtonsoft.Json</dest>
+        </dependency>
+        <dependency>
+            <artifactType>opensource</artifactType>
+            <artifactId>Internet Information Services (IIS) 10.0 Express</artifactId>
+            <version>10.15000.100</version>
+            <package>iisexpress_amd64_en-US.msi</package>
+            <dest>open_source/IISExpress</dest>
+        </dependency>
+    </dependencies>
+</project>

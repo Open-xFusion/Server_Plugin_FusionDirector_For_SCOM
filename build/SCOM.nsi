@@ -2,13 +2,13 @@
 
 Var /GLOBAL IC_DN40 #.Net frameworker 4.0
 Var /GLOBAL IC_SCOM #SCOM Server
+Var /GLOBAL TYPE # Install,Upgrade
 
 ; HM NIS Edit Wizard helper defines
 !define SOURCEDIR "..\Release"
 !define PRODUCT_NAME "XFUSION FusionDirector For SCOM plugin"
 !define PRODUCT_PUBLISHER "xFusion Digital Technologies Co., Ltd."
 !define PRODUCT_WEB_SITE "https://www.xfusion.com"
-;!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\FusionDirectorPlugin.Service.exe"
 !define PRODUCT_UNINST_KEY "Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 !define PATH_KEY "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
@@ -21,7 +21,6 @@ Unicode true
 !include "WinMessages.nsh"
 !include "WinCore.nsh"
 !include "x64.nsh"
-!include "nsProcess.nsh"
 !include "StrFunc.nsh"
 !include "nsDialogs.nsh"
 !include "TextFunc.nsh"
@@ -45,12 +44,7 @@ Unicode true
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW ChageFONT
 !insertmacro MUI_PAGE_WELCOME
 
-; License page
-;!define MUI_LICENSEPAGE_CHECKBOX
-;!insertmacro MUI_PAGE_LICENSE "..\Desktop\License.txt"
-; Directory page
-
-
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipPage
 !insertmacro MUI_PAGE_DIRECTORY
 
 Page Custom fnc_agreeIISExpress_Show
@@ -60,7 +54,6 @@ Page Custom fnc_test_Show checkInput
 !insertmacro MUI_PAGE_INSTFILES
 
 ; Finish page
-;!define MUI_FINISHPAGE_RUN "$INSTDIR\Configuration\xFusion.SCOMPlugin.Client"
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW ChageFONT
 !insertmacro MUI_PAGE_FINISH
 
@@ -88,10 +81,8 @@ LangString Lan_keepIIS_Msg ${LANG_SIMPCHINESE} "卸载IIS Express 可能会影响其他正
 LangString Lan_Uninstall_Msg ${LANG_ENGLISH} "has been removed successfully from your computer."
 LangString Lan_Uninstall_Msg ${LANG_SIMPCHINESE} "已经从您的计算机中卸载。"
 
-
 LangString Lan_NotEmptyIP_Msg ${LANG_ENGLISH} "The IP can't be empty!"
 LangString Lan_NotEmptyIP_Msg ${LANG_SIMPCHINESE} "IP不能为空！"
-
 
 LangString Lan_InvalidIP_Msg ${LANG_ENGLISH} "Please enter a valid IP!"
 LangString Lan_InvalidIP_Msg ${LANG_SIMPCHINESE} "请输入有效的IP！"
@@ -144,12 +135,26 @@ LangString Lan_Port_Msg ${LANG_SIMPCHINESE} "端口："
 LangString Lan_CertPwd_Msg ${LANG_ENGLISH} "Certificate Password:"
 LangString Lan_CertPwd_Msg ${LANG_SIMPCHINESE} "证书密码："
 
+LangString Lan_Update_Msg ${LANG_ENGLISH} "You have installed ${PRODUCT_NAME} $OLD_VER, continue to upgrade to ${PRODUCT_NAME} ${VERSION}"
+LangString Lan_Update_Msg ${LANG_SIMPCHINESE} "您已经安装了${PRODUCT_NAME} $OLD_VER，继续安装将升级到${PRODUCT_NAME} ${VERSION}"
+
+LangString Lan_CloseSCOM_Msg ${LANG_ENGLISH} "Microsoft.EnterpriseManagement.Monitoring.Console.exe is running, the upgrade plug-in needs to close SCOM, whether to continue"
+LangString Lan_CloseSCOM_Msg ${LANG_SIMPCHINESE} "Microsoft.EnterpriseManagement.Monitoring.Console.exe 正在运行,升级插件需要关闭SCOM,是否继续"
+
+LangString Lan_RestartSCOM_Msg ${LANG_ENGLISH} "Plugin upgrade complete, Whether to start SCOM immediately?"
+LangString Lan_RestartSCOM_Msg ${LANG_SIMPCHINESE} "插件升级完成, 是否立即启动SCOM?"
+
+LangString Lan_Failed_Msg ${LANG_ENGLISH} "The plug-in upgrade failed and has been restored to the original version. For specific reasons, please see the log $INSTDIR\Logs\xFusion.installer.log."
+LangString Lan_Failed_Msg ${LANG_SIMPCHINESE} "插件升级失败, 已恢复至原版本。 具体原因请见日志$INSTDIR\Logs\xFusion.installer.log。"
+
+LangString Lan_Stop_Service_Failed_Msg ${LANG_ENGLISH} "Plug-in upgrade failed because the XFUSION FusionDirector For SCOM plugin Service cannot be paused, please try again later"
+LangString Lan_Stop_Service_Failed_Msg ${LANG_SIMPCHINESE} "插件升级失败，因为无法暂停XFUSION FusionDirector For SCOM plugin Service服务，请稍后重试"
+
 ; MUI end ------
 
 Name "${PRODUCT_NAME} ${VERSION}"
 OutFile "XFUSION_FusionDirector_For_SCOM_Plugin_${VERSION}.exe"
 InstallDir "$PROGRAMFILES64\XFUSION FusionDirector For SCOM plugin"
-;InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show
 ShowUnInstDetails show
 BrandingText "XFUSION"
@@ -162,49 +167,125 @@ Var certpwd
 
 Section "MainSection" SEC01
 
-  SetOutPath "$INSTDIR"
-  SetOverwrite ifnewer
-  File /r "${SOURCEDIR}\"
+  ${If} $TYPE == "install"
+    SetOutPath "$INSTDIR"
+    SetOverwrite ifnewer
+    File /r "${SOURCEDIR}\"
 
-  DetailPrint "Start Exec PackageHelper.exe"
+    DetailPrint "Start Exec PackageHelper.exe"
 
-  nsExec::ExecToLog '"$INSTDIR\Configuration\FusionDirectorPlugin.PackageHelper.exe" /i /port=$port /ip=$ip /certpwd=$certpwd'
-  Pop $0
-  DetailPrint "PackageHelper.exe Exec Finish: $0"
-  #Result is 0 Mean the cmd has been exec successfully
-  ${If} $0 != "0"
-	 ${If} $0 == "-2"
-		MessageBox MB_ICONSTOP|MB_OK "Install Faild: The Certificate password is incorrect"
-	 ${Else}
-		MessageBox MB_ICONSTOP|MB_OK "Install Faild: $0"
-	 ${EndIf}
-	 
-	  RMDir /r "$INSTDIR\WebServer"
-	  RMDir /r "$INSTDIR\MPFiles"
-	  RMDir /r "$INSTDIR\Configuration"
-	  RMDir /r "$INSTDIR\Logs"
+    nsExec::ExecToLog '"$INSTDIR\Configuration\FusionDirectorPlugin.PackageHelper.exe" /i /port=$port /ip=$ip /certpwd=$certpwd'
+    Pop $0
+    DetailPrint "PackageHelper.exe Exec Finish: $0"
+    #Result is 0 Mean the cmd has been exec successfully
+    ${If} $0 != "0"
+      ${If} $0 == "-2"
+        MessageBox MB_ICONSTOP|MB_OK "Install Faild: The Certificate password is incorrect"
+      ${Else}
+        MessageBox MB_ICONSTOP|MB_OK "Install Faild: $0"
+      ${EndIf}
 
-	  RMDir /r "$INSTDIR\KN"
-	  RMDir /r "$INSTDIR\Certs"
-	 
-	 ${If} $0 == "-2"
-		 Abort "Install Faild: The Certificate password is incorrect"
-	 ${Else}
-		 Abort "Install Faild: $0"
-	 ${EndIf}
-	 
+      RMDir /r "$INSTDIR\WebServer"
+      RMDir /r "$INSTDIR\MPFiles"
+      RMDir /r "$INSTDIR\Configuration"
+      RMDir /r "$INSTDIR\Logs"
+
+      RMDir /r "$INSTDIR\KN"
+      RMDir /r "$INSTDIR\Certs"
+
+      ${If} $0 == "-2"
+         Abort "Install Faild: The Certificate password is incorrect"
+      ${Else}
+         Abort "Install Faild: $0"
+      ${EndIf}
+
+    ${EndIf}
+  ${ElseIf} $TYPE == "upgrade"
+    ReadRegStr $INSTDIR ${PRODUCT_UNINST_ROOT_KEY} "${PATH_KEY}" "FDSCOMPLUGIN"
+
+    nsExec::ExecToLog /TIMEOUT=60000 'CMD.exe /C net stop "XFUSION FusionDirector For SCOM plugin Service"'
+    Pop $0
+    ${If} $0 != "0"
+      DetailPrint "Stop Service failed"
+      nsExec::ExecToLog 'CMD.exe /C taskkill /f /t /im FusionDirectorPlugin.Service.exe'
+    ${EndIf}
+
+    CreateDirectory "$INSTDIR\Temp\WebServer"
+    CreateDirectory "$INSTDIR\Temp\MPFiles"
+    CreateDirectory "$INSTDIR\Temp\Configuration"
+    CopyFiles "$INSTDIR\WebServer\*" "$INSTDIR\Temp\WebServer"
+    CopyFiles "$INSTDIR\MPFiles\*" "$INSTDIR\Temp\MPFiles"
+    CopyFiles "$INSTDIR\Configuration\*" "$INSTDIR\Temp\Configuration"
+    CopyFiles "$INSTDIR\uninst.exe" "$INSTDIR\Temp\uninst.exe"
+    StrCpy $R0 "0"
+    loop:
+    #The maximum number of loops is 20
+    ${If} $R0 == "20"
+      MessageBox MB_USERICON|MB_OK|MB_TOPMOST "$(Lan_Stop_Service_Failed_Msg)"
+      nsExec::ExecToLog 'net start "XFUSION FusionDirector For SCOM plugin Service"'
+      Rmdir /r "$INSTDIR\Temp"
+      Quit
+    ${EndIf}
+    IntOp $R0 $R0 + 1
+    Sleep 3000
+    ClearErrors
+    Delete "$INSTDIR\Configuration\FusionDirectorPlugin.Service.exe"
+    IfErrors loop done
+    done:
+    RMDir /r "$INSTDIR\WebServer"
+    RMDir /r "$INSTDIR\MPFiles"
+    RMDir /r "$INSTDIR\Configuration"
+    Delete "$INSTDIR\uninst.exe"
+    SetOverwrite on
+    SetOutPath "$INSTDIR\WebServer"
+    File /r "${SOURCEDIR}\WebServer\*"
+
+    SetOutPath "$INSTDIR\MPFiles"
+    File /r "${SOURCEDIR}\MPFiles\*"
+
+    SetOutPath "$INSTDIR\Configuration"
+    File /r "${SOURCEDIR}\Configuration\*"
+
+    Delete "$INSTDIR\Configuration\applicationhost.config"
+    CopyFiles "$INSTDIR\Temp\Configuration\PluginConfig.xml" "$INSTDIR\Configuration\PluginConfig.xml"
+    CopyFiles "$INSTDIR\Temp\Configuration\applicationhost.config" "$INSTDIR\Configuration\applicationhost.config"
+    CopyFiles "$INSTDIR\Temp\Configuration\FusionDirectorPlugin.Service.InstallLog" "$INSTDIR\Configuration\FusionDirectorPlugin.Service.InstallLog"
+    CopyFiles "$INSTDIR\Temp\Configuration\FusionDirectorPlugin.Service.InstallLog" "$INSTDIR\Configuration\Microsoft.EnterpriseManagement.Runtime.dll"
+    CopyFiles "$INSTDIR\Temp\Configuration\FusionDirectorPlugin.Service.InstallLog" "$INSTDIR\Configuration\Microsoft.EnterpriseManagement.Core.dll"
+    CopyFiles "$INSTDIR\Temp\Configuration\FusionDirectorPlugin.Service.InstallLog" "$INSTDIR\Configuration\Microsoft.EnterpriseManagement.OperationsManager.dll"
+    CopyFiles "$INSTDIR\Temp\Configuration\FusionDirectorPlugin.Service.InstallLog" "$INSTDIR\Configuration\Microsoft.EnterpriseManagement.Packaging.dll"
+    nsExec::ExecToLog '"$INSTDIR\Configuration\FusionDirectorPlugin.PackageHelper.exe" /upgrade'
+    Pop $0
+    RMDir /r "$INSTDIR\MPFiles\Temp"
+    RMDir /r "$INSTDIR\MPResources.resources"
+    ${If} $0 != "0"
+      Copyfiles "$INSTDIR\Configuration\*" "$INSTDIR\Temp"
+      RMDir /r "$INSTDIR\WebServer"
+      RMDir /r "$INSTDIR\MPFiles"
+      RMDir /r "$INSTDIR\Configuration"
+      CreateDirectory "$INSTDIR\Temp\WebServer"
+      CreateDirectory "$INSTDIR\Temp\MPFiles"
+      CreateDirectory "$INSTDIR\Temp\Configuration"
+      CopyFiles "$INSTDIR\Temp\WebServer\*" "$INSTDIR\WebServer"
+      CopyFiles "$INSTDIR\Temp\MPFiles\*" "$INSTDIR\MPFiles"
+      CopyFiles "$INSTDIR\Temp\Configuration\*" "$INSTDIR\Configuration"
+      CopyFiles "$INSTDIR\Temp\uninst.exe" "$INSTDIR\uninst.exe"
+      #Result is 2 means that the management pack needs to be reinstalled
+      ${If} $0 == "-2"
+        nsExec::ExecToLog '"$INSTDIR\Temp\FusionDirectorPlugin.PackageHelper.exe" /restore /restoreMp=true'
+      ${Else}
+        nsExec::ExecToLog '"$INSTDIR\Temp\FusionDirectorPlugin.PackageHelper.exe" /restore /restoreMp=false'
+      ${EndIf}
+      MessageBox MB_USERICON|MB_OK|MB_TOPMOST "$(Lan_Failed_Msg)"
+      RMDir /r "$INSTDIR\Temp"
+      Quit
+    ${EndIf}
   ${EndIf}
-  
-  RMDir /r "$INSTDIR\MPFiles\Temp"
-  RMDir /r "$INSTDIR\MPResources.resources"
-
-  ;ExecWait 'cmd'
+  RMDir /r "$INSTDIR\Temp"
  SectionEnd
 
 Section -Post
-
   WriteUninstaller "$INSTDIR\uninst.exe"
- ; WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\Configuration\xFusion.SCOMPlugin.WindowsService.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${VERSION}"
@@ -227,12 +308,12 @@ FunctionEnd
 
 
 Function un.myUnOnGuiInit
-  ${nsProcess::FindProcess} "Microsoft.EnterpriseManagement.Monitoring.Console.exe" $R0
-  StrCmp $R0 "0" On_Abort End
-  On_Abort:
-	MessageBox MB_USERICON|MB_OK|MB_TOPMOST "$(Lan_CheckSCOMIsRuning_Msg)"
-	Abort
-  End:
+    nsExec::ExecToStack 'CMD.exe /C tasklist /fo csv| find /i "Microsoft.EnterpriseManagement.Monitoring.Console.exe"'
+    Pop $0
+    ${If} $0 == "0"
+        MessageBox MB_USERICON|MB_OK|MB_TOPMOST "$(Lan_CheckSCOMIsRuning_Msg)"
+        Abort
+    ${EndIf}
 
   MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "$(Lan_ConfirmUninstall_Msg) $(^Name)?" IDYES keep IDNO none
   keep:
@@ -262,6 +343,17 @@ Section Uninstall
   Delete "$INSTDIR\InstallUtil.InstallLog"
   Delete "$INSTDIR\iisexpress_amd64_en-US.install.log"
   Delete "$INSTDIR\iisexpress_amd64_en-US.uninstall.log"
+  StrCpy $0 "0"
+  loop:
+  ${If} $R0 == "20"
+    Goto done
+  ${EndIf}
+  IntOp $R0 $R0 + 1
+  Sleep 3000
+  ClearErrors
+  Delete "$INSTDIR\Configuration\FusionDirectorPlugin.Service.exe"
+  IfErrors loop done
+  done:
   RMDir /r "$INSTDIR\WebServer"
   RMDir /r "$INSTDIR\MPFiles"
   RMDir /r "$INSTDIR\Configuration"
@@ -273,12 +365,10 @@ Section Uninstall
 
   DetailPrint "FDSCOMPLUGIN..."
   DeleteRegValue ${PRODUCT_UNINST_ROOT_KEY} "${PATH_KEY}" "FDSCOMPLUGIN"
-  ;ExecWait 'cmd'
   SetAutoClose true
 SectionEnd
 
 Function .onInit
-  ;Call CheckSCOMPlugin
 	!insertmacro mui_langdll_display
 
 FunctionEnd
@@ -286,12 +376,14 @@ FunctionEnd
 Function .onMyGuiInit
 	Call CheckOS
 	Call CheckSCOM
-	Call CheckSCOMPluginIsInstall
 	Call CheckNF
+	Call CheckSCOMPlugin
 FunctionEnd
 
 Function .onInstSuccess
-
+  ${If} $TYPE == "upgrade"
+    Call startSCOM
+  ${EndIf}
 FunctionEnd
 
 Function .onGUIEnd
@@ -317,10 +409,9 @@ Function fnc_test_Create
   ${EndIf}
   !insertmacro MUI_HEADER_TEXT "$(Lan_ConfigHeader_Msg)" "$(Lan_ConfigTip_Msg)"
 
-   ; === TextBox2 (type: Text) ===
+  ; === TextBox2 (type: Text) ===
   ${NSD_CreateText} 108.4u 33.67u 77.24u 14u ""
   Pop $hCtl_test_TextBox2
-  ;${NSD_OnChange} $hCtl_test_TextBox2 ipCheck
 
   ; === Label2 (type: Label) ===
   ${NSD_CreateLabel} 30.4u 35.67u 75u 16u "$(Lan_IP_Msg)"
@@ -330,8 +421,7 @@ Function fnc_test_Create
   ; === TextBox1 (type: Text) ===
   ${NSD_CreateNumber} 108.4u 55.67u 77.24u 14u "44301"
   Pop $hCtl_test_TextBox1
- StrCpy $port "44301"
-  ;${NSD_OnChange} $hCtl_test_TextBox1 portChange
+  StrCpy $port "44301"
 
   ; === Label1 (type: Label) ===
   ${NSD_CreateLabel} 30.4u 57.67u 75u 16u "$(Lan_Port_Msg)"
@@ -371,7 +461,6 @@ Function fnc_agreeIISExpress_Create
 
   ${NSD_OnClick} $hCtl_agree_CheckBox1 EnDisableButton
 
-  ;${NSD_OnChange} $hCtl_test_TextBox2 ipCheck
   ; === Label2 (type: Label) ===
   ${NSD_CreateLabel} 25.8u 26.67u 50.33u 16u "IIS Express"
   Pop $hCtl_agree_Label1
@@ -395,16 +484,18 @@ FunctionEnd
 
 ; dialog show function
 Function fnc_test_Show
-  Call fnc_test_Create
-  nsDialogs::Show
-
+  ${If} $TYPE == "install"
+    Call fnc_test_Create
+    nsDialogs::Show
+  ${EndIf}
 FunctionEnd
 
 ; dialog show function
 Function fnc_agreeIISExpress_Show
-  Call fnc_agreeIISExpress_Create
-  nsDialogs::Show
-
+  ${If} $TYPE == "install"
+    Call fnc_agreeIISExpress_Create
+    nsDialogs::Show
+  ${EndIf}
 FunctionEnd
 
 Function EnDisableButton
@@ -421,9 +512,6 @@ FunctionEnd
 
 
 Function ipCheck
-  ;Pop $1 # $1 == $ Text
-  ;${NSD_GetText} $1 $0
-  ;StrCpy $port $0
   ${NSD_GetText} $hCtl_test_TextBox2 $ip
   ${if} $ip == ""
      MessageBox MB_USERICON|MB_OK  "$(Lan_NotEmptyIP_Msg)"
@@ -471,39 +559,23 @@ Function CheckOS
 	${EndIf}
 FunctionEnd
 
-# Function CheckSCOMIsRuning
-# 	${nsProcess::FindProcess} "Microsoft.EnterpriseManagement.Monitoring.Console.exe" $R0
-# 	StrCmp $R0 "0" On_Abort End
-# 	On_Abort:
-# 		MessageBox MB_USERICON|MB_OK|MB_TOPMOST "$(Lan_CheckSCOMIsRuning_Msg)"
-# 		Abort
-# 	End:
-
-# FunctionEnd
-
 Function IsNet40Installed
-	;LogText "Checking .Net frameworker4.0..."
 
 	Push $R0
 	Push $R1
 	ReadRegDWORD $R0 HKLM "SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" "Install"
 	ReadRegDWORD $R1 HKLM "SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" "Version"
 
-	;LogText ".Net frameworker install status is: $R0"
-;	LogText ".Net frameworker version is: $R1"
-
 	${If} $R0 == 1
 		${If} $R1 >= "4.0.30319"
 			StrCpy $R0 "Yes"
 			StrCpy $IC_DN40 $R0
-			;LogText "IC_DN40 Value is: $IC_DN40"
 			goto lbl_?net40idone
 		${EndIf}
 	${EndIf}
 
 	StrCpy $R0 "No"
 	StrCpy $IC_DN40 $R0
-	;LogText "IC_DN40 Value is: $IC_DN40"
 
 	lbl_?net40idone:
 
@@ -520,23 +592,19 @@ Function CheckNF
 FunctionEnd
 
 Function IsSCOMInstalled
-	;LogText "Checking SCOM..."
 
 	Push $R0
 	Push $R1
 	ReadRegDWORD $R1 HKLM "SOFTWARE\Microsoft\System Center Operations Manager\12\Setup" "ProductName"
-	;LogText "SCOM ProductName is: $R1"
 
 	${If} $R1 != ""
 		StrCpy $R0 "Yes"
 		StrCpy $IC_SCOM $R0
-		;LogText "IC_SCOM Value is: $IC_SCOM"
 		goto lbl_?sccmdone
 	${EndIf}
 
 	StrCpy $R0 "No"
 	StrCpy $IC_SCOM $R0
-	;LogText "IC_SCOM Value is: $IC_SCOM"
 
 	lbl_?sccmdone:
 
@@ -545,7 +613,6 @@ Function IsSCOMInstalled
 FunctionEnd
 
 Function CheckSCOM
-	;LogText "Checking SCOM ccc..."
 	Call IsSCOMInstalled
 	${If} $IC_SCOM == 'No'
 		MessageBox MB_USERICON|MB_OK|MB_TOPMOST "$(Lan_CheckSCOM_Msg)"
@@ -555,28 +622,69 @@ FunctionEnd
 
 Var UNINSTALL_PROG
 Var OLD_VER
-;Var OLD_PATH
 
-Function CheckSCOMPluginIsInstall
-
-  ReadRegStr $UNINSTALL_PROG ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString"
-  ;ReadRegStr $OLD_PATH HKLM "Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString"
-
-  ReadRegStr $OLD_VER ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion"
-  ${If} $OLD_VER = ""
-	goto norun
+Function checkSCOMPlugin
+  Push $R0
+  Push $R1
+  ReadRegStr $R0 ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName"
+  ReadRegStr $Old_VER ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion"
+  ${If} $R0 == ""
+    StrCpy $TYPE "install"
+  ${Else}
+    ${VersionCompare} $Old_VER ${VERSION} $R0
+    ${If} $R0 == 0
+      CALL UninstallSCOMPlugin
+    ${ElseIf} $R0 == 1
+      CALL UninstallSCOMPlugin
+    ${ElseIf} $R0 == 2
+      StrCpy $TYPE "upgrade"
+      MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON1 "$(Lan_Update_Msg)" IDYES Next
+    ${EndIf}
+    Abort
+    Next:
+    Call closeSCOM
   ${EndIf}
+  Pop $R1
+  Exch $R0
+FunctionEnd
 
-  MessageBox MB_ICONQuESTION|MB_YESNO "$(Lan_ConfirmUpgrade_Msg)" IDYES keep IDNO none
+Function UninstallSCOMPlugin
+  ReadRegStr $UNINSTALL_PROG ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString"
+  MessageBox MB_ICONQuESTION|MB_YESNO|MB_DEFBUTTON2 "$(Lan_ConfirmUpgrade_Msg)" IDYES keep IDNO none
   keep:
     ExecWait '$UNINSTALL_PROG'
     Abort
   none:
     Quit
-  norun:
-
 FunctionEnd
 
+Function CloseSCOM
+  nsExec::ExecToStack 'CMD.exe /C tasklist /fo csv| find /i "Microsoft.EnterpriseManagement.Monitoring.Console.exe"'
+  Pop $0
+  ${If} $0 == "0"
+    MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON1 "$(Lan_CloseSCOM_Msg)" IDYES Close
+    Abort
+    Close:
+      nsExec::Exec 'CMD.exe /C taskkill /f /t /im Microsoft.EnterpriseManagement.Monitoring.Console.exe'
+  ${EndIf}
+FunctionEnd
+
+Function StartSCOM
+  nsExec::ExecToStack 'CMD.exe /C tasklist /fo csv| find /i "Microsoft.EnterpriseManagement.Monitoring.Console.exe"'
+  Pop $0
+  ${If} $0 != "0"
+    MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON1 "$(Lan_RestartSCOM_Msg)" IDNO End
+    ReadRegDWORD $R0 HKLM "SOFTWARE\Microsoft\System Center Operations Manager\12\Setup\Console" "InstallDirectory"
+    nsExec::Exec 'CMD.exe /C cd $R0 && start Microsoft.EnterpriseManagement.Monitoring.Console.exe'
+  ${EndIf}
+  End:
+FunctionEnd
+
+Function SkipPage
+  ${If} $TYPE == "upgrade"
+    Abort
+  ${EndIf}
+FunctionEnd
 
 Function ChageFONT
  GetDlgItem $0 $MUI_HWND 1201

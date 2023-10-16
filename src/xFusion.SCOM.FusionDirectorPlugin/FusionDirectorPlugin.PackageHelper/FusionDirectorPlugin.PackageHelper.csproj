@@ -75,8 +75,8 @@
     <Reference Include="Microsoft.EnterpriseManagement.Core, Version=7.0.5000.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL" />
     <Reference Include="Microsoft.EnterpriseManagement.OperationsManager, Version=7.0.5000.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL" />
     <Reference Include="Microsoft.EnterpriseManagement.Packaging, Version=7.0.5000.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL" />
-    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
-      <HintPath>..\..\..\open_source\NLog\NLog.4.5.11\lib\net45\NLog.dll</HintPath>
+    <Reference Include="NLog">
+      <HintPath>..\..\..\open_source\NLog\NLog\lib\net45\NLog.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -93,7 +93,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="..\..\..\vendor\IISExpress\iisexpress_amd64_en-US.msi">
+    <None Include="..\..\..\open_source\IISExpress\iisexpress_amd64_en-US.msi">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
@@ -117,6 +117,10 @@
     <ProjectReference Include="..\FusionDirectorPlugin.Model\FusionDirectorPlugin.Model.csproj">
       <Project>{dd1e2214-e24d-41ef-b4b5-44a8e7f94c0d}</Project>
       <Name>FusionDirectorPlugin.Model</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\FusionDirectorPlugin.ViewLib\FusionDirectorPlugin.ViewLib.csproj">
+      <Project>{800ae076-991f-431c-b164-9a031230f2f8}</Project>
+      <Name>FusionDirectorPlugin.ViewLib</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

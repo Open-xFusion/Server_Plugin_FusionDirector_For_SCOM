@@ -22,6 +22,7 @@
 // <summary></summary>
 // ***********************************************************************
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FusionDirectorPlugin.Dal.Model;
 using FusionDirectorPlugin.Model;
@@ -53,7 +54,7 @@ namespace FusionDirectorPlugin.Api
         /// <returns>OK</returns>
         public async Task<ServerList> GetServerCollectionAsync(string groupId, string bMcip, string group, int? skip, int? top)
         {
-            var url = $"{this.BaseUrl}/redfish/v1/rich/Nodes?";
+            string url = $"{this.BaseUrl}/redfish/v1/rich/Nodes/Actions/Server.Filter?";
             try
             {
                 if (groupId != null)
@@ -73,21 +74,49 @@ namespace FusionDirectorPlugin.Api
 
                 if (skip != null)
                 {
-                    url += $"skip={Uri.EscapeDataString(skip.Value.ToString())}&";
+                    url += $"$skip={Uri.EscapeDataString(skip.Value.ToString())}&";
                 }
 
                 if (top != null)
                 {
-                    url += $"top={Uri.EscapeDataString(top.Value.ToString())}&";
+                    url += $"$top={Uri.EscapeDataString(top.Value.ToString())}&";
                 }
                 url = url.TrimEnd('?').TrimEnd('&');
-                var responseData = await BaseGetAsync(url, 2);
+                var responseData = await BasePostAsync(url, new Newtonsoft.Json.Linq.JObject());
                 return JsonConvert.DeserializeObject<ServerList>(responseData);
             }
             catch (Exception e)
             {
                 throw ProcessException(url, e);
             }
+        }
+
+        /// <summary>
+        /// 查询所有服务器信息
+        /// </summary>
+        /// <param name="groupId">指定Groups资源的系统组名称。</param>
+        /// <param name="bMcip">指定BMC的IP地址。</param>
+        /// <param name="group">指定Groups资源的用户组名称。</param>
+        /// <param name="limitQuantity">服务器数量限制</param>
+        /// <returns>OK</returns>
+        public async Task<ServerList> GetAllServerAsync(
+                        string groupId, string bMcip, string group, int limitQuantity)
+        {
+            int skip = 0;
+            int top = Math.Min(500, limitQuantity - skip);
+            List<ServerSummary> serverList = new List<ServerSummary>();
+            ServerList result = await this.GetServerCollectionAsync(groupId, bMcip, group, skip, top);
+            int totalCount = Math.Min(result.Membersodatacount ?? limitQuantity, limitQuantity);
+            serverList.AddRange(result.Members);
+            while (serverList.Count < totalCount)
+            {
+                skip += top;
+                top = Math.Min(top, limitQuantity - skip);
+                result = await this.GetServerCollectionAsync(groupId, bMcip, group, skip, top);
+                serverList.AddRange(result.Members);
+            }
+            result.Members = serverList;
+            return result;
         }
 
         /// <summary>

@@ -433,7 +433,7 @@ namespace FusionDirectorPlugin.Service
                     var server = await QueryServerDetailsById(task.DeviceId);
                     task.DeviceFirst = server;
                     logger.NotifyProcess.Debug($"{logPre} Query Server Finish:[{JsonConvert.SerializeObject(server)}].");
-                    await ServerConnector.Instance.Sync(server);
+                    await ServerConnector.Instance.Sync(server, FusionDirectorPluginService.MAX_SERVER_COUNT > FusionDirectorPluginService.dealServerCount());
                     logger.NotifyProcess.Debug($"{logPre} Sync Server Success.");
                 }
                 catch (Exception e)
@@ -466,7 +466,7 @@ namespace FusionDirectorPlugin.Service
                             if (isChange)
                             {
                                 logger.NotifyProcess.Debug($"{logPre} Query Server Finish:[{JsonConvert.SerializeObject(server)}].");
-                                await ServerConnector.Instance.Sync(server);
+                                await ServerConnector.Instance.Sync(server, FusionDirectorPluginService.MAX_SERVER_COUNT > FusionDirectorPluginService.dealServerCount());
                                 logger.NotifyProcess.Debug($"{logPre} Sync Server Success.");
                             }
 
@@ -491,6 +491,7 @@ namespace FusionDirectorPlugin.Service
         private void RunKeepEventTask()
         {
             logger.Polling.Info($"Run EventSevice keep alive Task.");
+            this.Subscribe();
             this.keepEventTimer = new Timer(15 * 60 * 1000)
             {
                 Enabled = true,
